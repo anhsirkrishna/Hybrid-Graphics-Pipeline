@@ -45,10 +45,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\libs\;$(ProjectDir)..\libs\assimp\include;$(ProjectDir)..\libs\imgui-master;$(VULKAN_SDK)\Include;$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(ProjectDir)..\libs\;$(ProjectDir)..\libs\assimp\include;$(ProjectDir)..\libs\imgui-master;$(VULKAN_SDK)\Include;$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -56,10 +57,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(VULKAN_SDK)\Lib\vulkan-1.lib;$(ProjectDir)..\libs\assimp\64\assimp.lib;$(ProjectDir)..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -70,24 +73,85 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(VULKAN_SDK)\Lib\vulkan-1.lib;$(ProjectDir)..\libs\assimp\64\assimp.lib;$(ProjectDir)..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\libs\imgui-master\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\libs\imgui-master\backends\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\libs\imgui-master\imgui.cpp" />
+    <ClCompile Include="..\libs\imgui-master\imgui_draw.cpp" />
+    <ClCompile Include="..\libs\imgui-master\imgui_widgets.cpp" />
     <ClCompile Include="App.cpp" />
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="DescriptorWrap.cpp" />
+    <ClCompile Include="extensions_vk.cpp" />
     <ClCompile Include="Graphics.cpp" />
+    <ClCompile Include="ImageWrap.cpp" />
+    <ClCompile Include="LoadModel.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ScanlineGraphics.cpp" />
+    <ClCompile Include="TimerWrap.cpp" />
+    <ClCompile Include="Util.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
+    <ClInclude Include="BufferWrap.h" />
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="DescriptorWrap.h" />
+    <ClInclude Include="extensions_vk.hpp" />
     <ClInclude Include="Graphics.h" />
+    <ClInclude Include="ImageWrap.h" />
+    <ClInclude Include="shaders\shared_structs.h" />
+    <ClInclude Include="TimerWrap.h" />
+    <ClInclude Include="Util.h" />
     <ClInclude Include="Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="shaders\post.frag">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\post.vert">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\scanline.frag">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\scanline.vert">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
