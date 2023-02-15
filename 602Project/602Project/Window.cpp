@@ -50,7 +50,7 @@ GLFWwindow* Window::GetGLFWPointer() {
 }
 
 void Window::SetupGraphics() {
-    p_gfx = std::make_unique<Graphics>(this);
+    p_gfx = std::make_unique<Graphics>(this, false);
 }
 
 void WindowResize(GLFWwindow* window, int w, int h) {

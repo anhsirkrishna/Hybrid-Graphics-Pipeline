@@ -8,7 +8,7 @@
 #include "GLFW/glfw3native.h"
 
 Camera::Camera() : spin(-20.0), tilt(10.66), ry(0.57), front(0.1), back(1000.0),
-eye({ 2.279976, 1.677772, 6.640697 }), updated(false) {
+eye({ 4.279976, 1.677772, -0.640697 }), updated(false) {
 }
 
 glm::mat4 Camera::perspective(const float aspect)
@@ -60,11 +60,19 @@ void Camera::HandleKeyInputs(float dt) {
 
 void Camera::HandleMouseInputs(float dt) {
     GLFWwindow* GLFW_window = p_control_window->GetGLFWPointer();
+    double x, y;
+    glfwGetCursorPos(GLFW_window, &x, &y);
 
-    if (glfwGetMouseButton(GLFW_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        double x, y;
-        glfwGetCursorPos(GLFW_window, &x, &y);
+    if (glfwGetMouseButton(GLFW_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+        update_mouse = true;
+    else if (glfwGetMouseButton(GLFW_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
+        update_mouse = false;
+
+    if (update_mouse) {
         mouseMove(x, y);
+    }
+    else {
+        setMousePosition(x, y);
     }
 }
 

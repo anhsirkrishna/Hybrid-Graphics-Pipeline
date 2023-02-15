@@ -29,6 +29,7 @@ private:
     glm::vec3 eye;
 
     bool updated;
+    bool update_mouse;
 
     float posx = 0.0;
     float posy = 0.0;
