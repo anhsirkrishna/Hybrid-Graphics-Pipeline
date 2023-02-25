@@ -330,13 +330,6 @@ ImageWrap Graphics::CreateTextureImage(std::string fileName) {
     stbi_image_free(pixels);
 
     uint mipLevels = std::floor(std::log2(std::max(texWidth, texHeight))) + 1;
-    /*
-    ImageWrap myImage = createImageWrap(texWidth, texHeight, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                                  | VK_IMAGE_USAGE_SAMPLED_BIT
-                                  | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                  mipLevels);*/
 
     ImageWrap myImage(texWidth, texHeight, vk::Format::eR8G8B8A8Unorm,
         vk::ImageUsageFlagBits::eTransferDst |
@@ -346,17 +339,13 @@ ImageWrap Graphics::CreateTextureImage(std::string fileName) {
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         mipLevels, this);
 
-    TransitionImageLayout(myImage.image, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eTransferDstOptimal, mipLevels);
-    CopyBufferToImage(staging.buffer, myImage.image, static_cast<uint32_t>(texWidth),
+    myImage.TransitionImageLayout(vk::ImageLayout::eTransferDstOptimal);
+    myImage.CopyFromBuffer(staging.buffer, static_cast<uint32_t>(texWidth),
         static_cast<uint32_t>(texHeight));
 
     staging.destroy(m_device);
-
-    GenerateMipmaps(myImage.image, vk::Format::eR8G8B8A8Unorm, texWidth, texHeight, mipLevels);
-
-    vk::ImageAspectFlags aspect;
-    myImage.sampler = CreateTextureSampler();
-    myImage.image_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    myImage.GenerateMipMaps();
+    
+    myImage.CreateTextureSampler();
     return myImage;
 }

@@ -7,8 +7,8 @@
 #include "GLFW/glfw3.h"
 #include "GLFW/glfw3native.h"
 
-Camera::Camera() : spin(-20.0), tilt(10.66), ry(0.57), front(0.1), back(1000.0),
-eye({ 4.279976, 1.677772, -0.640697 }), updated(false) {
+Camera::Camera() : spin(-80.0), tilt(30), ry(0.57), front(0.1), back(1000.0),
+eye({ 2.988857, 1.20160866, -1.58941591 }), updated(false) {
 }
 
 glm::mat4 Camera::perspective(const float aspect)
@@ -59,6 +59,9 @@ void Camera::HandleKeyInputs(float dt) {
 }
 
 void Camera::HandleMouseInputs(float dt) {
+    if (ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureMouse)
+        return;
+
     GLFWwindow* GLFW_window = p_control_window->GetGLFWPointer();
     double x, y;
     glfwGetCursorPos(GLFW_window, &x, &y);
@@ -107,4 +110,9 @@ void Camera::Update(float dt) {
 
 void Camera::SetControlWindow(Window* _p_window) {
     p_control_window = _p_window;
+}
+
+void Camera::DrawGUI() {
+    ImGui::Text("Camera eye x: %f  y: %f  z: %f", 
+        eye.x, eye.y, eye.z);
 }

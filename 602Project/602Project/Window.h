@@ -16,6 +16,7 @@ private:
 	GLFWwindow* glfw_window;
 	std::unique_ptr<Graphics> p_gfx;
 
+	bool show_gui;
 public:
 	Window(int _width, int _height, const char* name) noexcept;
 	~Window();
@@ -33,6 +34,8 @@ public:
 
 	void SetupGraphics();
 	Graphics& Gfx() { return *p_gfx; }
+
+	void DrawGUI();
 };
 
 //Input handling callbacks

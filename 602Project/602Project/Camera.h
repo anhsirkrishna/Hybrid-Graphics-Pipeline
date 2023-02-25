@@ -16,6 +16,8 @@ public:
     void Update(float dt);
 
     void SetControlWindow(Window* _p_window);
+
+    void DrawGUI();
 private:
     float ry;
     float front;

@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.hpp>  // A modern C++ API for Vulkan. Beware 14K lines of code
 
 #include <stdint.h>
+#include <memory>
 
 // Imgui
 #define GUI
@@ -28,12 +29,14 @@
 #include "DescriptorWrap.h"
 #include "BufferWrap.h"
 #include "Util.h"
+#include "RenderPass.h"
 
 class Window;
 class Camera;
 
 class Graphics
 {
+	friend class ImageWrap;
 private:
 	Window* p_parent_window;
 	Camera* p_active_cam;
@@ -78,24 +81,16 @@ private:
 	DescriptorWrap m_post_proc_desc;
 	
 	//Resources required for the scanline render pass
-	ImageWrap m_sc_img_buffer;
+	/*ImageWrap m_sc_img_buffer;
 	vk::RenderPass m_scanline_renderpass;
 	vk::Framebuffer m_scanline_framebuffer;
 	DescriptorWrap m_scanline_desc;
 	vk::PipelineLayout m_scanline_pipeline_layout;
-	vk::Pipeline m_scanline_pipeline;
-
-	// Arrays of objects instances and textures in the scene
-	std::vector<ObjData>  m_objData;  // Obj data in Vulkan Buffers
-	std::vector<ObjDesc>  m_objDesc;  // Device-addresses of those buffers
-	std::vector<ImageWrap>  m_objText;  // All textures of the scene
-	std::vector<ObjInst>  m_objInst;  // Instances paring an object and a transform
-
-	BufferWrap m_objDescriptionBW;  // Device buffer of the OBJ descriptions
-	BufferWrap m_matrixBW;  // Device-Host of the camera matrices
-	BufferWrap m_lightBW; //BufferWrap for the emitter data
+	vk::Pipeline m_scanline_pipeline;*/
 
 	glm::mat4 m_prior_viewproj;
+
+	std::vector<std::unique_ptr<RenderPass>> render_passes;
 private:
 	//Creates and intializes the vk::Instance
 	void CreateInstance(bool api_dump);
@@ -111,6 +106,8 @@ private:
 
 	//Gets the command queue from the device
 	void GetCommandQueue();
+
+	vk::Format GetSupportedDepthFormat();
 
 	//Loads the vulkan extensions
 	void LoadExtensions();
@@ -142,7 +139,7 @@ private:
 	void CreatePostFrameBuffers();
 	
 	//Create a Descriptor for the post processing.
-	void CreatePostDescriptor();
+	void CreatePostDescriptor(const ImageWrap& scanline_buffer);
 
 	//Create the post processing pipeline
 	void CreatePostPipeline();
@@ -150,25 +147,7 @@ private:
 	//Post processing render pass
 	void PostProcess();
 
-	//Create the framebuffers for the scanline render pass
-	void CreateScanlineFrameBuffers();
-
-	//Create the ImageWrap for the Scanline pass
-	void CreateScanlineBufferImage(const vk::Extent2D& window_size);
-
-	//Create the vk::RenderPass for scanline graphics
-	void CreateScanlineRenderPass();
-
 	void CreateObjDescriptionBuffer();
-
-	void CreateScDescriptorSet();
-
-	void CreateScPipeline();
-
-	void Rasterize();
-
-	//Cleanup all the created resources for the scanline pass
-	void TeardownScanlineResources();
 
 	void CreateMatrixBuffer();
 
@@ -184,13 +163,32 @@ private:
 
 	void UpdateCameraBuffer();
 public:
+	// Arrays of objects instances and textures in the scene
+	std::vector<ObjData>  m_objData;  // Obj data in Vulkan Buffers
+	std::vector<ObjDesc>  m_objDesc;  // Device-addresses of those buffers
+	std::vector<ImageWrap>  m_objText;  // All textures of the scene
+	std::vector<ObjInst>  m_objInst;  // Instances paring an object and a transform
+
+	BufferWrap m_objDescriptionBW;  // Device buffer of the OBJ descriptions
+	BufferWrap m_matrixBW;  // Device-Host of the camera matrices
+	BufferWrap m_lightBW; //BufferWrap for the emitter data
+
+	void DestroyUniformData();
+public:
 	Graphics(Window* _p_parent_window, bool api_dump=true);
 
 	void DrawFrame();
 	//Clean up all the created vulkan related resources
 	void Teardown();
 
+	void DrawGUI();
+
 	void SetActiveCamPtr(Camera* p_cam);
+
+	vec2 GetWindowSize() const;
+	const vk::Extent2D& GetWindowExtent() const;
+
+	const ImageWrap& GetDepthBuffer() const;
 
 	const vk::Device& GetDeviceRef() const { return m_device; }
 	const vk::PhysicalDevice& GetPhysicalDeviceRef() const { return m_physical_device; }
@@ -207,8 +205,6 @@ public:
 		vk::ImageLayout newLayout,
 		uint32_t mipLevels = 1);
 
-	void CopyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
-
 	void GenerateMipmaps(vk::Image image, vk::Format imageFormat,
 		int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 
@@ -216,7 +212,7 @@ public:
 		vk::Image image,
 		vk::ImageLayout oldImageLayout,
 		vk::ImageLayout newImageLayout,
-		vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor);
+		vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor) const;
 
 	vk::ShaderModule CreateShaderModule(std::string code);
 
@@ -237,6 +233,10 @@ public:
 		vk::MemoryPropertyFlags properties);
 
 	void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
+
+	const vk::CommandBuffer& GetCommandBuffer() const;
+
+	void CommandCopyImage(const ImageWrap& src, const ImageWrap& dst) const;
 };
 
 vk::AccessFlags AccessFlagsForImageLayout(vk::ImageLayout layout);

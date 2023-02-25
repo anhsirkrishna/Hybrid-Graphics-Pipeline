@@ -5,7 +5,7 @@ static void glfwErrCallback(int error, const char* desc) {
 }
 
 Window::Window(int _width, int _height, const char* name) noexcept :
-        width(_width), height(_height) {
+        width(_width), height(_height), show_gui(true) {
 	glfwSetErrorCallback(glfwErrCallback);
 
 	if ( !glfwInit() ) {
@@ -42,6 +42,11 @@ bool Window::BeginFrame() {
 
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    if (show_gui) {
+        DrawGUI();
+    }
+        
     return true;
 }
 
@@ -51,6 +56,11 @@ GLFWwindow* Window::GetGLFWPointer() {
 
 void Window::SetupGraphics() {
     p_gfx = std::make_unique<Graphics>(this, false);
+}
+
+void Window::DrawGUI() {
+    ImGui::Text("Rate %.3f ms/frame (%.1f FPS)",
+        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 }
 
 void WindowResize(GLFWwindow* window, int w, int h) {

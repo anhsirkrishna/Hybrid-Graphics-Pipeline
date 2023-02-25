@@ -5,6 +5,8 @@
 #include "Graphics.h"
 #include "Window.h"
 #include "Camera.h"
+#include "DOFPass.h"
+#include "LightingPass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -186,6 +188,30 @@ void Graphics::CreateDevice() {
 
 void Graphics::GetCommandQueue() {
     m_queue = m_device.getQueue(m_graphics_queue_index, 0);
+}
+
+vk::Format Graphics::GetSupportedDepthFormat() {
+    // Since all depth formats may be optional, we need to find a suitable depth format to use
+    // Start with the highest precision packed format
+    std::vector<vk::Format> default_depth_formats = {
+        vk::Format::eD32SfloatS8Uint,
+        vk::Format::eD32Sfloat,
+        vk::Format::eD24UnormS8Uint,
+        vk::Format::eD16UnormS8Uint,
+        vk::Format::eD16Unorm
+    };
+
+    for (auto& format : default_depth_formats)
+    {
+        vk::FormatProperties format_props = m_physical_device.getFormatProperties(format);
+        // Format must support depth stencil attachment for optimal tiling
+        if (format_props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+        {
+            return format;
+        }
+    }
+
+    return vk::Format::eUndefined;
 }
 
 // Calling load_VK_EXTENSIONS from extensions_vk.cpp.  A Python script
@@ -408,14 +434,18 @@ void Graphics::SubmitTempCommandBuffer(vk::CommandBuffer cmd_buffer) {
 void Graphics::CreateDepthResource() {
     uint8_t mipLevels = 1;
 
+    vk::Format depth_format = GetSupportedDepthFormat();
     // Note m_depthImage is type ImageWrap; a tiny wrapper around
     // several related Vulkan objects.
     m_depth_image = ImageWrap(window_size.width, window_size.height,
-        vk::Format::eX8D24UnormPack32,
-        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+        depth_format,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment | 
+        vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eDepth,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         mipLevels, this);
+
+    m_depth_image.TransitionImageLayout(vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal);
 }
 
 void Graphics::CreatePostProcessRenderPass() {
@@ -427,7 +457,7 @@ void Graphics::CreatePostProcessRenderPass() {
     attachments[0].setSamples(vk::SampleCountFlagBits::e1);
 
     // Depth attachment
-    attachments[1].setFormat(vk::Format::eX8D24UnormPack32);
+    attachments[1].setFormat(m_depth_image.GetFormat());
     attachments[1].setLoadOp(vk::AttachmentLoadOp::eClear);
     attachments[1].setStencilLoadOp(vk::AttachmentLoadOp::eClear);
     attachments[1].setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
@@ -484,16 +514,16 @@ void Graphics::CreatePostFrameBuffers() {
     m_framebuffers.reserve(m_image_count);
     for (uint32_t i = 0; i < m_image_count; i++) {
         fbattachments[0] = m_image_views[i];         // A color attachment from the swap chain
-        fbattachments[1] = m_depth_image.image_view;  // A depth attachment
+        fbattachments[1] = m_depth_image.GetImageView();  // A depth attachment
         m_framebuffers.push_back(m_device.createFramebuffer(fbcreateInfo));
     }
 }
 
-void Graphics::CreatePostDescriptor() {
+void Graphics::CreatePostDescriptor(const ImageWrap& scanline_buffer) {
     m_post_proc_desc.setBindings(m_device, {
             {0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
         });
-    m_post_proc_desc.write(m_device, 0, m_sc_img_buffer.Descriptor());
+    m_post_proc_desc.write(m_device, 0, scanline_buffer.Descriptor());
 }
 
 void Graphics::CreatePostPipeline() {
@@ -647,6 +677,12 @@ void Graphics::InitGUI() {
     ImGui_ImplGlfw_InitForVulkan(p_parent_window->GetGLFWPointer(), true);
 }
 
+void Graphics::DrawGUI() {
+    for (auto& pass : render_passes) {
+        pass->DrawGUI();
+    }
+}
+
 
 void Graphics::PostProcess() {
     std::array<vk::ClearValue, 2> clearValues;
@@ -685,7 +721,7 @@ void Graphics::Teardown() {
     m_device.destroyDescriptorPool(m_imgui_descpool, nullptr);
     ImGui_ImplVulkan_Shutdown();
 
-    TeardownScanlineResources();
+    DestroyUniformData();
 
     m_device.destroyPipelineLayout(m_post_proc_pipeline_layout);
     m_device.destroyPipeline(m_post_proc_pipeline);
@@ -694,6 +730,11 @@ void Graphics::Teardown() {
         m_device.destroyFramebuffer(framebuffer);
     }
     m_device.destroyRenderPass(m_post_proc_render_pass);
+
+    for (auto& render_pass : render_passes) {
+        render_pass.reset();
+    }
+
     m_depth_image.destroy(m_device);
     m_post_proc_desc.destroy(m_device);
     DestroySwapchain();
@@ -701,6 +742,15 @@ void Graphics::Teardown() {
     m_instance.destroySurfaceKHR(m_surface);
     m_device.destroy();
     m_instance.destroy();
+}
+
+void Graphics::DestroyUniformData() {
+    for (auto ob : m_objData) ob.destroy(m_device);
+    for (auto t : m_objText) t.destroy(m_device);
+    
+    m_objDescriptionBW.destroy(m_device);
+    m_matrixBW.destroy(m_device);
+    m_lightBW.destroy(m_device);
 }
 
 Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
@@ -721,22 +771,31 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     CreatePostProcessRenderPass();
     CreatePostFrameBuffers();
 
-    CreateScanlineFrameBuffers();
-    CreatePostDescriptor();
-    CreatePostPipeline();
-
     InitGUI();
     
     /*
     * https://benedikt-bitterli.me/resources/
     */
     LoadModel("models/fireplace_room/fireplace_room.obj", glm::mat4());
-
     CreateMatrixBuffer();
     CreateObjDescriptionBuffer();
-    CreateScanlineRenderPass();
-    CreateScDescriptorSet();
-    CreateScPipeline();
+    
+    std::unique_ptr<LightingPass> p_lighting_pass = std::make_unique<LightingPass>(this);
+    CreatePostDescriptor(p_lighting_pass->GetBufferRef());
+    CreatePostPipeline();
+    
+    render_passes.push_back(std::move(p_lighting_pass));
+
+    //Add the depth of field pass to the list of passes.
+    std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, render_passes.back().get());
+    
+    
+    render_passes.push_back(std::move(p_dof_pass));
+
+    //Setup all the render passes
+    for (auto& render_pass : render_passes) {
+        render_pass->Setup();
+    }
 }
 
 void Graphics::SetActiveCamPtr(Camera* p_cam) {
@@ -782,8 +841,9 @@ void Graphics::DrawFrame() {
     {   // Extra indent for recording commands into m_commandBuffer
         UpdateCameraBuffer();
 
-
-        Rasterize();
+        for (auto& render_pass : render_passes) {
+            render_pass->Render();
+        }
 
         PostProcess(); //  tone mapper and output to swapchain image.
 
@@ -892,7 +952,7 @@ void Graphics::ImageLayoutBarrier(vk::CommandBuffer cmdbuffer,
     vk::Image image,
     vk::ImageLayout oldImageLayout,
     vk::ImageLayout newImageLayout,
-    vk::ImageAspectFlags aspectMask)
+    vk::ImageAspectFlags aspectMask) const
 {
     vk::ImageSubresourceRange subresourceRange;
     subresourceRange.setAspectMask(aspectMask);
@@ -953,26 +1013,26 @@ vk::ShaderModule Graphics::CreateShaderModule(std::string code) {
 
     return m_device.createShaderModule(sm_createInfo);
 }
-
-void Graphics::CopyBufferToImage(vk::Buffer buffer, vk::Image image, 
-    uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = CreateTempCommandBuffer();
-
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    SubmitTempCommandBuffer(commandBuffer);
-}
+//
+//void Graphics::CopyBufferToImage(vk::Buffer buffer, vk::Image image, 
+//    uint32_t width, uint32_t height) {
+//    VkCommandBuffer commandBuffer = CreateTempCommandBuffer();
+//
+//    VkBufferImageCopy region{};
+//    region.bufferOffset = 0;
+//    region.bufferRowLength = 0;
+//    region.bufferImageHeight = 0;
+//    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+//    region.imageSubresource.mipLevel = 0;
+//    region.imageSubresource.baseArrayLayer = 0;
+//    region.imageSubresource.layerCount = 1;
+//    region.imageOffset = { 0, 0, 0 };
+//    region.imageExtent = { width, height, 1 };
+//
+//    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+//
+//    SubmitTempCommandBuffer(commandBuffer);
+//}
 
 BufferWrap Graphics::CreateStagedBufferWrap(const vk::CommandBuffer& cmdBuf, const vk::DeviceSize& size, 
     const void* data, vk::BufferUsageFlags usage) {
@@ -993,6 +1053,18 @@ BufferWrap Graphics::CreateStagedBufferWrap(const vk::CommandBuffer& cmdBuf, con
     staging.destroy(m_device);
 
     return bw;
+}
+
+vec2 Graphics::GetWindowSize() const {
+    return vec2(window_size.width, window_size.height);
+}
+
+const vk::Extent2D& Graphics::GetWindowExtent() const {
+    return window_size;
+}
+
+const ImageWrap& Graphics::GetDepthBuffer() const {
+    return m_depth_image;
 }
 
 void Graphics::GenerateMipmaps(vk::Image image, vk::Format imageFormat,
@@ -1128,6 +1200,35 @@ void Graphics::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::Device
     commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
 
     SubmitTempCommandBuffer(commandBuffer);
+}
+
+const vk::CommandBuffer& Graphics::GetCommandBuffer() const {
+    return m_cmd_buffer;
+}
+
+void Graphics::CommandCopyImage(const ImageWrap& src, const ImageWrap& dst) const {
+    vk::ImageCopy img_copy_region;
+    img_copy_region.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    img_copy_region.srcSubresource.layerCount = 1;
+    img_copy_region.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    img_copy_region.dstSubresource.layerCount = 1;
+    img_copy_region.extent.width = window_size.width;
+    img_copy_region.extent.height = window_size.height;
+    img_copy_region.extent.depth = 1;
+
+    ImageLayoutBarrier(m_cmd_buffer, src.GetImage(),
+        vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal);
+    ImageLayoutBarrier(m_cmd_buffer, dst.GetImage(),
+        vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferDstOptimal);
+
+    m_cmd_buffer.copyImage(src.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+        dst.GetImage(), vk::ImageLayout::eTransferDstOptimal,
+        1, &img_copy_region);
+
+    ImageLayoutBarrier(m_cmd_buffer, dst.GetImage(),
+        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral);
+    ImageLayoutBarrier(m_cmd_buffer, src.GetImage(),
+        vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral);
 }
 
 

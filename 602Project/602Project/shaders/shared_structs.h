@@ -118,16 +118,14 @@ struct Material  // Created by readModel; used in shaders
   int   textureId;
 };
 
-
 // Push constant structure for the ray tracer
-struct PushConstantDenoise
+struct PushConstantDoF
 {
-  float normFactor;
-  float depthFactor;
-  float lumenFactor;
-
-  int  stepwidth;
-  bool demodulate;
+  float near_plane;
+  float focal_plane;
+  float far_plane;
+  float  max_depth;
+  vec2 window_size;
   int alignmentTest;
 };
 

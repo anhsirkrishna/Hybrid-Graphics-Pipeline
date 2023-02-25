@@ -9,6 +9,7 @@ App::App(int window_width, int window_height) :
 }
 
 int App::Run() {
+	m_show_gui = true;
 	while (window.BeginFrame()) {
 		Update();
 	}
@@ -20,5 +21,7 @@ int App::Run() {
 void App::Update() {
 	const auto dt = timer.Mark() * speed_factor;
 	cam.Update(dt);
+	cam.DrawGUI();
+	window.Gfx().DrawGUI();
 	window.Gfx().DrawFrame();
 }

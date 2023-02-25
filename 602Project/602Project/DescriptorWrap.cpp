@@ -3,10 +3,10 @@
 #include "Graphics.h"
 #include <assert.h>
 
-void DescriptorWrap::setBindings(const vk::Device device, std::vector<vk::DescriptorSetLayoutBinding> _bt) {
+void DescriptorWrap::setBindings(const vk::Device device, 
+    std::vector<vk::DescriptorSetLayoutBinding> _bt) {
     glm::uint maxSets = 1;
     bindingTable = _bt;
-
     // Build descSetLayout
     vk::DescriptorSetLayoutCreateInfo createInfo;
     createInfo.setBindingCount(uint32_t(bindingTable.size()));
@@ -51,12 +51,12 @@ void DescriptorWrap::setBindings(const vk::Device device, std::vector<vk::Descri
     device.allocateDescriptorSets(&allocInfo, &descSet);
 }
 
-void DescriptorWrap::destroy(vk::Device& device) {
+void DescriptorWrap::destroy(const vk::Device& device) {
     device.destroyDescriptorSetLayout(descSetLayout, nullptr);
     device.destroyDescriptorPool(descPool, nullptr);
 }
 
-void DescriptorWrap::write(vk::Device& device, glm::uint index, const vk::Buffer& buffer) {
+void DescriptorWrap::write(const vk::Device& device, glm::uint index, const vk::Buffer& buffer) {
     vk::DescriptorBufferInfo desBuf;
     desBuf.setBuffer(buffer);
     desBuf.setOffset(0);
@@ -81,7 +81,7 @@ void DescriptorWrap::write(vk::Device& device, glm::uint index, const vk::Buffer
 
 }
 
-void DescriptorWrap::write(vk::Device& device, glm::uint index, const vk::DescriptorImageInfo& textureDesc) {
+void DescriptorWrap::write(const vk::Device& device, glm::uint index, const vk::DescriptorImageInfo& textureDesc) {
     vk::WriteDescriptorSet writeSet;
     writeSet.setDstSet(descSet);
     writeSet.setDstBinding(index);
@@ -101,7 +101,7 @@ void DescriptorWrap::write(vk::Device& device, glm::uint index, const vk::Descri
     device.updateDescriptorSets(1, &writeSet, 0, nullptr);
 }
 
-void DescriptorWrap::write(vk::Device& device, glm::uint index, const std::vector<ImageWrap>& textures) {
+void DescriptorWrap::write(const vk::Device& device, glm::uint index, const std::vector<ImageWrap>& textures) {
     std::vector<vk::DescriptorImageInfo> des;
     for (auto& texture : textures)
         des.emplace_back(texture.Descriptor());
@@ -126,7 +126,7 @@ void DescriptorWrap::write(vk::Device& device, glm::uint index, const std::vecto
     device.updateDescriptorSets(1, &writeSet, 0, nullptr);
 }
 
-void DescriptorWrap::write(vk::Device& device, glm::uint index, const vk::AccelerationStructureKHR& tlas) {
+void DescriptorWrap::write(const vk::Device& device, glm::uint index, const vk::AccelerationStructureKHR& tlas) {
     vk::WriteDescriptorSetAccelerationStructureKHR descASInfo;
     descASInfo.setAccelerationStructureCount(1);
     descASInfo.setPAccelerationStructures(&tlas);

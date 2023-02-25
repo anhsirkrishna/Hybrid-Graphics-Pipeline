@@ -1,0 +1,44 @@
+#version 460
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shared_structs.h"
+
+const int GROUP_SIZE = 128;
+layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 0, rgba32f) uniform image2D inImage;
+layout(set = 0, binding = 1, rgba32f) uniform image2D outImage;
+layout(set = 0, binding = 2, r32f) uniform image2D depthImage;
+
+layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
+
+float ComputeDepthBlur(float depth) {
+    float depth_blur;
+    if (depth < pc.focal_plane) {
+        depth_blur = (depth - pc.focal_plane) / (pc.focal_plane - pc.near_plane);
+    }
+    else {
+        depth_blur = (depth - pc.focal_plane) / (pc.far_plane - pc.focal_plane);
+        depth_blur = min(depth_blur, 1);
+    }
+
+    //Scale and bias into range of 0 - 1
+    return (depth_blur * 0.5) + 0.5 ;
+}
+
+void main()
+{
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
+
+    if (pc.alignmentTest != 1234){
+        imageStore(outImage, gpos, vec4(vec3(0, 0, 1), 1));
+        return;
+    }
+    vec4 out_color = vec4(1, 1, 1, 0);
+    out_color = imageLoad(depthImage, gpos);
+    float max_depth = pc.max_depth;
+    float rel_depth = (max_depth - out_color.x) / max_depth;
+
+    imageStore(outImage, gpos, vec4(ComputeDepthBlur(rel_depth)));
+}

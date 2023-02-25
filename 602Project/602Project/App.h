@@ -14,5 +14,7 @@ private:
 	float speed_factor = 1.0f;
 	Window window;
 	void Update();
+	
+	bool m_show_gui;
 };
 

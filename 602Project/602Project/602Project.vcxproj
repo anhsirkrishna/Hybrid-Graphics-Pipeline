@@ -92,11 +92,14 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DescriptorWrap.cpp" />
+    <ClCompile Include="DOFPass.cpp" />
     <ClCompile Include="extensions_vk.cpp" />
     <ClCompile Include="Graphics.cpp" />
     <ClCompile Include="ImageWrap.cpp" />
+    <ClCompile Include="LightingPass.cpp" />
     <ClCompile Include="LoadModel.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="ScanlineGraphics.cpp" />
     <ClCompile Include="TimerWrap.cpp" />
     <ClCompile Include="Util.cpp" />
@@ -107,9 +110,12 @@
     <ClInclude Include="BufferWrap.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DescriptorWrap.h" />
+    <ClInclude Include="DOFPass.h" />
     <ClInclude Include="extensions_vk.hpp" />
     <ClInclude Include="Graphics.h" />
     <ClInclude Include="ImageWrap.h" />
+    <ClInclude Include="LightingPass.h" />
+    <ClInclude Include="RenderPass.h" />
     <ClInclude Include="shaders\shared_structs.h" />
     <ClInclude Include="TimerWrap.h" />
     <ClInclude Include="Util.h" />
@@ -152,6 +158,18 @@
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
     </CustomBuild>
+    <CustomBuild Include="shaders\DOF.comp">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
