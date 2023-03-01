@@ -446,6 +446,7 @@ void Graphics::CreateDepthResource() {
         mipLevels, this);
 
     m_depth_image.TransitionImageLayout(vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal);
+    m_depth_image.CreateTextureSampler();
 }
 
 void Graphics::CreatePostProcessRenderPass() {

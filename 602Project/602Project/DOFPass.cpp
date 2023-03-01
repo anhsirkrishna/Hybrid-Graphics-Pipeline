@@ -23,11 +23,11 @@ void DOFPass::DrawGUI() {
 
 void DOFPass::SetupDescriptor() {
     m_descriptor.setBindings(p_gfx->GetDeviceRef(), {
-        {0, vk::DescriptorType::eSampledImage, 1,
+        {0, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute},
         {1, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
-        {2, vk::DescriptorType::eSampledImage, 1,
+        {2, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute} });
 }
 

@@ -35,7 +35,7 @@ public:
 
     void GenerateMipMaps();
 
-    void CreateTextureSampler(vk::ImageLayout set_layout=vk::ImageLayout::eUndefined);
+    void CreateTextureSampler();
 
     void destroy(const vk::Device& device) {
         device.destroyImage(image);

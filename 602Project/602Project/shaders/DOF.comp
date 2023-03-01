@@ -7,11 +7,16 @@
 
 const int GROUP_SIZE = 128;
 layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
-layout(set = 0, binding = 0, rgba32f) uniform image2D inImage;
+layout(set = 0, binding = 0) uniform sampler2D inImage;
 layout(set = 0, binding = 1, rgba32f) uniform image2D outImage;
-layout(set = 0, binding = 2, r32f) uniform image2D depthImage;
+layout(set = 0, binding = 2) uniform sampler2D depthImage;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
+
+int num_taps = 10;
+float POISSON[10] = float[10](2/10.0f, 3/10.0f, 8/10.0f, 5/10.0f, 3/10.0f, 5/10.0f, 2/10.0f, 4/10.0f, 3/10.0f, 4/10.0f);
+
+
 
 float ComputeDepthBlur(float depth) {
     float depth_blur;
@@ -30,15 +35,16 @@ float ComputeDepthBlur(float depth) {
 void main()
 {
     ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
-
+    vec2 uv = gpos / vec2(pc.window_size);
     if (pc.alignmentTest != 1234){
         imageStore(outImage, gpos, vec4(vec3(0, 0, 1), 1));
         return;
     }
     vec4 out_color = vec4(1, 1, 1, 0);
-    out_color = imageLoad(depthImage, gpos);
+    out_color = texture(depthImage, uv);
     float max_depth = pc.max_depth;
     float rel_depth = (max_depth - out_color.x) / max_depth;
 
-    imageStore(outImage, gpos, vec4(ComputeDepthBlur(rel_depth)));
+    //imageStore(outImage, gpos, vec4(ComputeDepthBlur(rel_depth)));
+    imageStore(outImage, gpos, vec4(rel_depth, 0, 0, 0));
 }

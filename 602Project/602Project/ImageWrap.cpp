@@ -174,7 +174,7 @@ void ImageWrap::GenerateMipMaps() {
     image_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
-void ImageWrap::CreateTextureSampler(vk::ImageLayout set_layout) {
+void ImageWrap::CreateTextureSampler() {
     vk::PhysicalDeviceProperties properties = p_gfx->GetPhysicalDeviceRef().getProperties();
 
     vk::SamplerCreateInfo samplerInfo;
