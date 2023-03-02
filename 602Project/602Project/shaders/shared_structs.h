@@ -124,7 +124,7 @@ struct PushConstantDoF
   float near_plane;
   float focal_plane;
   float far_plane;
-  float  max_depth;
+  float max_depth;
   vec2 window_size;
   int alignmentTest;
 };

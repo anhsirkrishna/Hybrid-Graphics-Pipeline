@@ -3,9 +3,11 @@
 
 class LightingPass : public RenderPass {
 private:
+	bool display_velo_buffer;
 	//Resources required for the scanline render pass
 	uint8_t buffer_mip_levels;
 	ImageWrap m_buffer;
+	ImageWrap m_velocity_buffer;
 	void SetupBuffer();
 
 	PushConstantRaster m_push_consts;
@@ -31,6 +33,7 @@ public:
 	void Setup() override;
 	void Render() override;
 	void Teardown() override;
+	void DrawGUI() override;
 
 	const ImageWrap& GetBufferRef() const;
 };

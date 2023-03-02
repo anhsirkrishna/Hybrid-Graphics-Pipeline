@@ -5,6 +5,8 @@
 void LightingPass::SetupBuffer() {
     m_buffer.CreateTextureSampler();
     m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_velocity_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void LightingPass::SetupAttachments() {
@@ -18,6 +20,17 @@ void LightingPass::SetupAttachments() {
     color_attachment.setInitialLayout(vk::ImageLayout::eGeneral);
     color_attachment.setFinalLayout(vk::ImageLayout::eGeneral);
     m_framebuffer_attachments.push_back(color_attachment);
+
+    vk::AttachmentDescription color_velo_attachment;
+    color_velo_attachment.setFormat(vk::Format::eR32G32B32A32Sfloat);
+    color_velo_attachment.setSamples(vk::SampleCountFlagBits::e1);
+    color_velo_attachment.setLoadOp(vk::AttachmentLoadOp::eClear);
+    color_velo_attachment.setStoreOp(vk::AttachmentStoreOp::eStore);
+    color_velo_attachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
+    color_velo_attachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
+    color_velo_attachment.setInitialLayout(vk::ImageLayout::eGeneral);
+    color_velo_attachment.setFinalLayout(vk::ImageLayout::eGeneral);
+    m_framebuffer_attachments.push_back(color_velo_attachment);
 
     vk::AttachmentDescription depth_attachment;
     depth_attachment.setFormat(p_gfx->GetDepthBuffer().GetFormat());
@@ -36,14 +49,20 @@ void LightingPass::SetupRenderPass() {
     color_attachment_ref.setAttachment(0);
     color_attachment_ref.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
 
+    vk::AttachmentReference velo_attachment_ref;
+    velo_attachment_ref.setAttachment(1);
+    velo_attachment_ref.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    std::array<vk::AttachmentReference, 2> color_attachment_refs{ color_attachment_ref, velo_attachment_ref };
+
     vk::AttachmentReference depth_attachment_ref;
-    depth_attachment_ref.setAttachment(1);
+    depth_attachment_ref.setAttachment(2);
     depth_attachment_ref.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     vk::SubpassDescription subpass;
     subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
-    subpass.setColorAttachmentCount(1);
-    subpass.setPColorAttachments(&color_attachment_ref);
+    subpass.setColorAttachmentCount(2);
+    subpass.setPColorAttachments(color_attachment_refs.data());
     subpass.setPDepthStencilAttachment(&depth_attachment_ref);
 
     vk::SubpassDependency subpass_dependency;
@@ -75,6 +94,7 @@ void LightingPass::SetupRenderPass() {
 void LightingPass::SetupFramebuffer() {
     std::vector<vk::ImageView> attachments = { 
         m_buffer.GetImageView(), 
+        m_velocity_buffer.GetImageView(),
         p_gfx->GetDepthBuffer().GetImageView()};
 
     vk::FramebufferCreateInfo info;
@@ -202,11 +222,17 @@ void LightingPass::SetupPipeline() {
     colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
     colorBlendAttachment.setBlendEnable(VK_FALSE);
 
+    vk::PipelineColorBlendAttachmentState velo_blend_attachment;
+    velo_blend_attachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+    velo_blend_attachment.setBlendEnable(VK_FALSE);
+
+    std::array< vk::PipelineColorBlendAttachmentState, 2> blend_attachments{ colorBlendAttachment, velo_blend_attachment };
+
     vk::PipelineColorBlendStateCreateInfo colorBlending;
     colorBlending.setLogicOpEnable(VK_FALSE);
     colorBlending.setLogicOp(vk::LogicOp::eCopy);
-    colorBlending.setAttachmentCount(1);
-    colorBlending.setPAttachments(&colorBlendAttachment);
+    colorBlending.setAttachmentCount(2);
+    colorBlending.setPAttachments(blend_attachments.data());
     colorBlending.setBlendConstants({ 0.0f , 0.0f , 0.0f , 0.0f });
 
     vk::GraphicsPipelineCreateInfo pipelineInfo;
@@ -246,7 +272,17 @@ LightingPass::LightingPass(Graphics* _p_gfx) : RenderPass(_p_gfx),
         vk::ImageUsageFlagBits::eColorAttachment,
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
-        buffer_mip_levels, p_gfx) {
+        buffer_mip_levels, p_gfx),
+    m_velocity_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx), display_velo_buffer(false) {
 
     SetupBuffer();
     SetupAttachments();
@@ -264,6 +300,7 @@ LightingPass::~LightingPass() {
     
     m_descriptor.destroy(p_gfx->GetDeviceRef());
     m_buffer.destroy(p_gfx->GetDeviceRef());
+    m_velocity_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void LightingPass::Setup() {
@@ -272,14 +309,15 @@ void LightingPass::Setup() {
 void LightingPass::Render() {
     vk::DeviceSize offset{ 0 };
 
-    std::array<vk::ClearValue, 2> clearValues;
+    std::array<vk::ClearValue, 3> clearValues;
     vk::ClearColorValue colorVal;
     colorVal.setFloat32({ 0.0f,0,0,1 });
     clearValues[0].setColor(colorVal);
-    clearValues[1].setDepthStencil(vk::ClearDepthStencilValue({ 1.0f, 0 }));
+    clearValues[1].setColor(colorVal);
+    clearValues[2].setDepthStencil(vk::ClearDepthStencilValue({ 1.0f, 0 }));
 
     vk::RenderPassBeginInfo _i;
-    _i.setClearValueCount(2);
+    _i.setClearValueCount(3);
     _i.setPClearValues(clearValues.data());
     _i.setRenderPass(m_render_pass);
     _i.setFramebuffer(m_framebuffer);
@@ -322,9 +360,16 @@ void LightingPass::Render() {
         gfx_command_buffer.drawIndexed(object.nbIndices, 1, 0, 0, 0);
     }
     gfx_command_buffer.endRenderPass();
+
+    if (display_velo_buffer)
+        p_gfx->CommandCopyImage(m_velocity_buffer, m_buffer);
 }
 
 void LightingPass::Teardown() {
+}
+
+void LightingPass::DrawGUI() {
+    ImGui::Checkbox("Draw Velo Buffer", &display_velo_buffer);
 }
 
 const ImageWrap& LightingPass::GetBufferRef() const {

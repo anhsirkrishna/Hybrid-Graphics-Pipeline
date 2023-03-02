@@ -15,10 +15,9 @@ void DOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo i
 }
 
 void DOFPass::DrawGUI() {
-    ImGui::SliderFloat("Near plane : ", &m_push_consts.near_plane, 0.0f, 1.0f);
     ImGui::SliderFloat("Focal plane : ", &m_push_consts.focal_plane, 0.0f, 1.0f);
-    ImGui::SliderFloat("Far plane : ", &m_push_consts.far_plane, 0.0f, 1.0f);
-    ImGui::SliderFloat("Max Depth : ", &m_push_consts.max_depth, 0.0f, 10.0f);
+    /*ImGui::SliderFloat("Max CoC radius: ", &m_push_consts.coc_max, 0.0f, 10.0f);
+    ImGui::SliderFloat("Min CoC radius: ", &m_push_consts.coc_min, 0.0f, 10.0f);*/
 }
 
 void DOFPass::SetupDescriptor() {
@@ -75,12 +74,12 @@ m_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
     vk::ImageAspectFlagBits::eColor, 
     vk::MemoryPropertyFlagBits::eDeviceLocal, 
     1, p_gfx), m_push_consts() {
-    m_push_consts.near_plane = 0.2f;
+    m_push_consts.near_plane = 0.0f;
     m_push_consts.focal_plane = 0.6f;
-    m_push_consts.far_plane = 0.8f;
-    m_push_consts.max_depth = 1.0f;
-    m_push_consts.alignmentTest = 1234;
+    m_push_consts.far_plane = 1.0f;
+    m_push_consts.max_depth = 0.8f;
     m_push_consts.window_size = p_gfx->GetWindowSize();
+    m_push_consts.alignmentTest = 1234;
     SetupBuffer();
     SetupDescriptor();
 }

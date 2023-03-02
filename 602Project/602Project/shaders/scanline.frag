@@ -25,6 +25,7 @@ layout(location=3) in vec3 viewDir;
 layout(location=4) in vec2 texCoord;
 // Outgoing
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec4 fragVelo;
 
 layout(buffer_reference, scalar) buffer Vertices {Vertex v[]; };    // Positions of an object
 layout(buffer_reference, scalar) buffer Indices {uint i[]; };       // Triangle indices
@@ -76,5 +77,5 @@ void main()
     brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
 
     fragColor.xyz = pcRaster.ambientLight*Kd + pcRaster.lightIntensity*NL*brdf;
-
+    fragVelo = vec4(0, 1, 0 , 1);
 }
