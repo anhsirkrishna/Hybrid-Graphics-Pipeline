@@ -3,7 +3,7 @@
 #include "Graphics.h"
 #include <assert.h>
 
-void DescriptorWrap::setBindings(const vk::Device device, 
+void DescriptorWrap::setBindings(const vk::Device device,
     std::vector<vk::DescriptorSetLayoutBinding> _bt) {
     glm::uint maxSets = 1;
     bindingTable = _bt;
@@ -17,26 +17,90 @@ void DescriptorWrap::setBindings(const vk::Device device,
     // Collect the size required for each descriptorType into a vector of poolSizes
     std::vector<vk::DescriptorPoolSize> poolSizes;
 
-    for (auto it = bindingTable.cbegin(); it != bindingTable.cend(); ++it)  {
+    for (auto it = bindingTable.cbegin(); it != bindingTable.cend(); ++it) {
         bool found = false;
         for (auto itpool = poolSizes.begin(); itpool != poolSizes.end(); ++itpool) {
-            if(itpool->type == it->descriptorType) {
+            if (itpool->type == it->descriptorType) {
                 itpool->descriptorCount += it->descriptorCount * maxSets;
                 found = true;
-                break; } }
-    
+                break;
+            }
+        }
+
         if (!found) {
             vk::DescriptorPoolSize poolSize;
             poolSize.setType(it->descriptorType);
             poolSize.setDescriptorCount(it->descriptorCount * maxSets);
-            poolSizes.push_back(poolSize); } }
+            poolSizes.push_back(poolSize);
+        }
+    }
 
-    
+
     // Build descPool
     vk::DescriptorPoolCreateInfo descrPoolInfo;
     descrPoolInfo.setMaxSets(maxSets);
     descrPoolInfo.setPoolSizeCount(poolSizes.size());
     descrPoolInfo.setPPoolSizes(poolSizes.data());
+    device.createDescriptorPool(&descrPoolInfo, nullptr, &descPool);
+
+    // Allocate DescriptorSet/
+    vk::DescriptorSetAllocateInfo allocInfo;
+    allocInfo.setDescriptorPool(descPool);
+    allocInfo.setDescriptorSetCount(1);
+    allocInfo.setPSetLayouts(&descSetLayout);
+
+    // Warning: The next line creates a single descriptor set from the
+    // above pool since that's all our program needs.  This is too
+    // restrictive in general, but fine for this program.
+    device.allocateDescriptorSets(&allocInfo, &descSet);
+}
+
+void DescriptorWrap::setBindings(const vk::Device device, 
+    std::vector<vk::DescriptorSetLayoutBinding> _bt, 
+    std::vector<vk::DescriptorBindingFlags> _bt_flags) {
+    glm::uint maxSets = 1;
+    bindingTable = _bt;
+    // Build descSetLayout
+    vk::DescriptorSetLayoutCreateInfo createInfo;
+    createInfo.setBindingCount(uint32_t(bindingTable.size()));
+    createInfo.setPBindings(bindingTable.data());
+
+    vk::DescriptorSetLayoutBindingFlagsCreateInfo binding_flags_create_info;
+    binding_flags_create_info.setBindingFlags(_bt_flags);
+
+    createInfo.setFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
+    createInfo.setPNext(&binding_flags_create_info);
+
+    device.createDescriptorSetLayout(&createInfo, nullptr, &descSetLayout);
+
+    // Collect the size required for each descriptorType into a vector of poolSizes
+    std::vector<vk::DescriptorPoolSize> poolSizes;
+
+    for (auto it = bindingTable.cbegin(); it != bindingTable.cend(); ++it) {
+        bool found = false;
+        for (auto itpool = poolSizes.begin(); itpool != poolSizes.end(); ++itpool) {
+            if (itpool->type == it->descriptorType) {
+                itpool->descriptorCount += it->descriptorCount * maxSets;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            vk::DescriptorPoolSize poolSize;
+            poolSize.setType(it->descriptorType);
+            poolSize.setDescriptorCount(it->descriptorCount * maxSets);
+            poolSizes.push_back(poolSize);
+        }
+    }
+
+
+    // Build descPool
+    vk::DescriptorPoolCreateInfo descrPoolInfo;
+    descrPoolInfo.setMaxSets(maxSets);
+    descrPoolInfo.setPoolSizeCount(poolSizes.size());
+    descrPoolInfo.setPPoolSizes(poolSizes.data());
+    descrPoolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
     device.createDescriptorPool(&descrPoolInfo, nullptr, &descPool);
 
     // Allocate DescriptorSet/

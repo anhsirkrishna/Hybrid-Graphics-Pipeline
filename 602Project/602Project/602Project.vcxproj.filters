@@ -59,6 +59,12 @@
     <ClCompile Include="LightingPass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="BufferDebugDraw.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="TileMaxPass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -101,6 +107,12 @@
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
     <ClInclude Include="LightingPass.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="BufferDebugDraw.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="TileMaxPass.h">
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
   </ItemGroup>
@@ -147,6 +159,12 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="shaders\DOF.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\BufferDebugDraw.frag">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\BufferDebugDraw.vert">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>

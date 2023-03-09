@@ -18,6 +18,9 @@ public:
     vk::DescriptorSet descSet;// Could be  vector<VkDescriptorSet> for multiple sets;
 
     void setBindings(const vk::Device device, std::vector<vk::DescriptorSetLayoutBinding> _bt);
+    void setBindings(const vk::Device device, 
+        std::vector<vk::DescriptorSetLayoutBinding> _bt,
+        std::vector<vk::DescriptorBindingFlags> _bt_flags);
     void destroy(const vk::Device& device);
 
     void write(const vk::Device& device, glm::uint index, const vk::Buffer& buffer);

@@ -19,13 +19,13 @@ layout(push_constant) uniform _PushConstantRaster
 
 // clang-format off
 // Incoming 
-layout(location=1) in vec3 worldPos;
+layout(location=1) in vec4 worldPos;
 layout(location=2) in vec3 worldNrm;
 layout(location=3) in vec3 viewDir;
 layout(location=4) in vec2 texCoord;
 // Outgoing
 layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec4 fragVelo;
+layout(location = 1) out vec4 fragVeloDepth;
 
 layout(buffer_reference, scalar) buffer Vertices {Vertex v[]; };    // Positions of an object
 layout(buffer_reference, scalar) buffer Indices {uint i[]; };       // Triangle indices
@@ -48,7 +48,7 @@ void main()
   
     vec3 N = normalize(worldNrm);
     vec3 V = normalize(viewDir);
-    vec3 lDir = pcRaster.lightPosition - worldPos;
+    vec3 lDir = pcRaster.lightPosition - worldPos.xyz;
     vec3 L = normalize(lDir);
     vec3 H = normalize(L+V);
     
@@ -77,5 +77,5 @@ void main()
     brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
 
     fragColor.xyz = pcRaster.ambientLight*Kd + pcRaster.lightIntensity*NL*brdf;
-    fragVelo = vec4(0, 1, 0 , 1);
+    fragVeloDepth = vec4(1, 0, 0 , worldPos.w);
 }

@@ -102,7 +102,7 @@ void Camera::wheel(const int dir)
 }
 
 void Camera::Update(float dt) {
-    prev_view = view();
+    //prev_view = view();
     updated = false;
 
     HandleKeyInputs(dt);

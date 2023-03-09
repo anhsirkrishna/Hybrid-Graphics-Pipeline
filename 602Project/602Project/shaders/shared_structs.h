@@ -129,6 +129,16 @@ struct PushConstantDoF
   int alignmentTest;
 };
 
+// Push constant structure for Debug buffer draw pass
+struct PushConstantDrawBuffer
+{
+	float near_plane;
+	float focal_plane;
+	float far_plane;
+	int draw_buffer;
+	int alignmentTest;
+};
+
 struct RayPayload
 {
 	uint seed;

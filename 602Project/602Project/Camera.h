@@ -36,7 +36,7 @@ private:
     float posx = 0.0;
     float posy = 0.0;
 
-    mat4 prev_view;
+    //mat4 prev_view;
 
     Window* p_control_window;
 

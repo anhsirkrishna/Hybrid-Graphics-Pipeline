@@ -6,6 +6,7 @@ void LightingPass::SetupBuffer() {
     m_buffer.CreateTextureSampler();
     m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 
+    m_velocity_buffer.CreateTextureSampler();
     m_velocity_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
@@ -282,7 +283,7 @@ LightingPass::LightingPass(Graphics* _p_gfx) : RenderPass(_p_gfx),
         vk::ImageUsageFlagBits::eColorAttachment,
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
-        1, p_gfx), display_velo_buffer(false) {
+        1, p_gfx) {
 
     SetupBuffer();
     SetupAttachments();
@@ -360,18 +361,18 @@ void LightingPass::Render() {
         gfx_command_buffer.drawIndexed(object.nbIndices, 1, 0, 0, 0);
     }
     gfx_command_buffer.endRenderPass();
-
-    if (display_velo_buffer)
-        p_gfx->CommandCopyImage(m_velocity_buffer, m_buffer);
 }
 
 void LightingPass::Teardown() {
 }
 
 void LightingPass::DrawGUI() {
-    ImGui::Checkbox("Draw Velo Buffer", &display_velo_buffer);
 }
 
 const ImageWrap& LightingPass::GetBufferRef() const {
     return m_buffer;
+}
+
+const ImageWrap& LightingPass::GetVeloDepthBufferRef() const {
+    return m_velocity_buffer;
 }

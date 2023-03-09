@@ -16,7 +16,7 @@ layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 int num_taps = 10;
 float POISSON[10] = float[10](2/10.0f, -3/10.0f, -8/10.0f, 5/10.0f, 3/10.0f, -5/10.0f, 2/10.0f, -4/10.0f, -3/10.0f, 4/10.0f);
 
-float coc_max = 10.0f;
+float coc_max = 15.0f;
 float coc_min = 5.0f;
 
 float ComputeDepthBlur(float depth) {

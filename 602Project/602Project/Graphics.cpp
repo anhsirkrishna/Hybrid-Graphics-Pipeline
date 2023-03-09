@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "DOFPass.h"
 #include "LightingPass.h"
+#include "BufferDebugDraw.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -700,8 +701,7 @@ void Graphics::PostProcess() {
             / static_cast<float>(window_size.height);
 
         m_cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_post_proc_pipeline);
-        //vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        //                       m_postPipelineLayout, 0, 0, nullptr, 0, nullptr);
+
         m_cmd_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, 
             m_post_proc_pipeline_layout, 0, 1, &m_post_proc_desc.descSet, 0, nullptr);
         // Weird! This draws 3 vertices but with no vertices/triangles buffers bound in.
@@ -755,7 +755,7 @@ void Graphics::DestroyUniformData() {
 }
 
 Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
-    p_parent_window(_p_parent_window) {
+    p_parent_window(_p_parent_window), do_post_process(true) {
 	CreateInstance(api_dump);
     CreatePhysicalDevice();
     ChooseQueueIndex();
@@ -785,13 +785,20 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     CreatePostDescriptor(p_lighting_pass->GetBufferRef());
     CreatePostPipeline();
     
-    render_passes.push_back(std::move(p_lighting_pass));
+    
 
     //Add the depth of field pass to the list of passes.
-    std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, render_passes.back().get());
+    std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_lighting_pass.get());
     
-    
+
+    //Add the debug buffer draw pass to the list of passes.
+    std::unique_ptr<BufferDebugDraw> p_debug_buffer_pass = 
+        std::make_unique<BufferDebugDraw>(this, p_dof_pass.get());
+    p_debug_buffer_pass->SetVeloDepthBuffer(p_lighting_pass->GetVeloDepthBufferRef());
+
+    render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_dof_pass));
+    render_passes.push_back(std::move(p_debug_buffer_pass));
 
     //Setup all the render passes
     for (auto& render_pass : render_passes) {
@@ -846,12 +853,21 @@ void Graphics::DrawFrame() {
             render_pass->Render();
         }
 
-        PostProcess(); //  tone mapper and output to swapchain image.
+        if (do_post_process)
+            PostProcess(); //  tone mapper and output to swapchain image.
 
         m_cmd_buffer.end();
     }   // Done recording;  Execute!
 
     SubmitFrame();
+}
+
+void Graphics::EnablePostProcess() {
+    do_post_process = true;
+}
+
+void Graphics::DisablePostProcess() {
+    do_post_process = false;
 }
 
 // Gets a list of memory types supported by the GPU, and search
@@ -1062,6 +1078,14 @@ vec2 Graphics::GetWindowSize() const {
 
 const vk::Extent2D& Graphics::GetWindowExtent() const {
     return window_size;
+}
+
+uint32_t Graphics::GetCurrentSwapchainIndex() const {
+    return m_swapchain_index;
+}
+
+const std::vector<vk::ImageView>& Graphics::GetSwapChainImageViews() const {
+    return m_image_views;
 }
 
 const ImageWrap& Graphics::GetDepthBuffer() const {

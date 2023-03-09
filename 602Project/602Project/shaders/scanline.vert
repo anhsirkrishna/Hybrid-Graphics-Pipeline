@@ -22,7 +22,7 @@ layout(location = 1) in vec3 i_normal;
 layout(location = 2) in vec2 i_texCoord;
 
 
-layout(location = 1) out vec3 worldPos;
+layout(location = 1) out vec4 worldPos;
 layout(location = 2) out vec3 worldNrm;
 layout(location = 3) out vec3 viewDir;
 layout(location = 4) out vec2 texCoord;
@@ -37,10 +37,11 @@ void main()
 {
   vec3 eye = vec3(mats.viewInverse * vec4(0, 0, 0, 1));
 
-  worldPos = vec3(pcRaster.modelMatrix * vec4(i_position, 1.0));
-  viewDir  = vec3(eye - worldPos);
+  worldPos.xyz = vec3(pcRaster.modelMatrix * vec4(i_position, 1.0));
+  viewDir  = vec3(eye - worldPos.xyz);
   texCoord = i_texCoord;
   worldNrm = mat3(pcRaster.modelMatrix) * i_normal;
 
-  gl_Position = mats.viewProj * vec4(worldPos, 1.0);
+  gl_Position = mats.viewProj * vec4(worldPos.xyz, 1.0);
+  worldPos.w = gl_Position.w;
 }

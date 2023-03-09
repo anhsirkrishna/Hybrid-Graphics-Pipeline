@@ -91,6 +91,8 @@ private:
 	glm::mat4 m_prior_viewproj;
 
 	std::vector<std::unique_ptr<RenderPass>> render_passes;
+
+	bool do_post_process;
 private:
 	//Creates and intializes the vk::Instance
 	void CreateInstance(bool api_dump);
@@ -188,10 +190,15 @@ public:
 	vec2 GetWindowSize() const;
 	const vk::Extent2D& GetWindowExtent() const;
 
+	uint32_t GetCurrentSwapchainIndex() const;
+	const std::vector<vk::ImageView>& GetSwapChainImageViews() const;
 	const ImageWrap& GetDepthBuffer() const;
 
 	const vk::Device& GetDeviceRef() const { return m_device; }
 	const vk::PhysicalDevice& GetPhysicalDeviceRef() const { return m_physical_device; }
+
+	void EnablePostProcess();
+	void DisablePostProcess();
 
 	//Helper function to find required memory type
 	uint8_t FindMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags properties) const;
