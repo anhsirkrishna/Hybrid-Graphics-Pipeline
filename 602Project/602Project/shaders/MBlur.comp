@@ -1,0 +1,106 @@
+#version 460
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shared_structs.h"
+
+layout(push_constant) uniform _pc_mblur { PushConstantMBlur pc; };
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 0, rgba32f) uniform image2D out_image;
+layout(set = 0, binding = 1, rgba32f) uniform image2D color_buffer;
+layout(set = 0, binding = 2, rgba32f) uniform image2D vel_depth_buffer;
+layout(set = 0, binding = 3, rgba32f) uniform image2D neighbour_max_buffer;
+
+float random(float _min, float _max) {
+    vec2 co = vec2(_min, _max);
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float softDepthCompare(float depth1, float depth2) {
+    return clamp(1 - ((depth1 - depth2) / pc.soft_z_extent), 0, 1);
+}
+
+float cone(ivec2 X, ivec2 Y, vec2 vel) {
+    return clamp(1 - (length(vec2(X-Y))/length(vel)), 0, 1);
+}
+
+float cylinder(ivec2 X, ivec2 Y, vec2 vel) {
+    return 1.0 - smoothstep(0.95f*length(vel), 1.05f*length(vel), length(vec2(X-Y)));
+}
+
+void main() {
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
+    if (pc.alignmentTest != 1234) {
+        imageStore(out_image, gpos, vec4(vec3(0, 1, 1), 1));
+        return;
+    }
+
+    //Velocity is stored in the xy component of the NeighbourMax buffer
+    vec2 neighbour_vel = imageLoad(neighbour_max_buffer, ivec2(gpos/pc.tile_size)).xy;
+    
+    //Current pixel color
+    vec4 out_color = imageLoad(color_buffer, gpos);
+
+    //Current velocity_depth
+    vec4 curr_vel_depth = imageLoad(vel_depth_buffer, gpos);
+
+    if (length(neighbour_vel) < pc.velocity_threshold) {
+        //No blur since the velocity isn't high enough
+        imageStore(out_image, gpos, out_color);
+    }
+
+    //Sample the current pixel
+    float weight = 1 / length(neighbour_vel);
+    out_color *= weight;
+
+//    vec2 texel_size = 1 / vec2(imageSize(vel_depth_buffer));
+//    vec2 uv = texel_size * gpos;
+
+    //Get a random jitter value
+    float jitter = random(-0.5, 0.5);
+
+    //Taking S-1 samples
+    int S = pc.max_samples;
+    for (int i=0; i < S; ++i) {
+        if (i == (S-1)/2)
+            continue;
+
+        //Caclulate the scale factor for the velocity based on the jitter and current sample
+        float t = mix(-1.0, 1.0, (i + jitter + 1.0f)/( S + 1.0f));
+        //Find the sampling position by scaling the velocity by the scale factor
+        ivec2 load_pos = ivec2(vec2(gpos) + (neighbour_vel * t) + vec2(0.5f));
+        //Sample the velocity and depth. 
+        //Velocity stored in the xy component. Depth stored in the w component.
+        vec4 sample_vel_depth = imageLoad(vel_depth_buffer, load_pos);
+
+        //Foreground vs background classification
+        float fg = softDepthCompare(curr_vel_depth.w, sample_vel_depth.w);
+        float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
+
+        float alpha = (fg * cone(load_pos, gpos, sample_vel_depth.xy)) +
+                      (bg * cone(gpos, load_pos, curr_vel_depth.xy)) +
+                      (cylinder(load_pos, gpos, sample_vel_depth.xy) * cylinder(gpos, load_pos, curr_vel_depth.xy) * 2);
+
+        weight += alpha;
+        out_color += alpha * imageLoad(color_buffer, load_pos);
+    }
+
+//    vec2 vel = imageLoad(vel_depth_buffer, gpos).rg;
+//    vel *= pc.velocity_scale;
+//
+//    float speed = length(vel / texel_size); 
+//    int sample_count = clamp(int(speed), 1, pc.max_samples);
+//    
+//    
+//
+//    for (int i=1; i < sample_count; ++i) {
+//        vec2 offset = vel * (( i / float(sample_count - 1)) - 0.5); 
+//        out_color += imageLoad(color_buffer, uv + offset);
+//    }
+//    
+//    out_color /= float(sample_count);
+
+    imageStore(out_image, gpos, out_color/weight);
+}

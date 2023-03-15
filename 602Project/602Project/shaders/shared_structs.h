@@ -118,7 +118,17 @@ struct Material  // Created by readModel; used in shaders
   int   textureId;
 };
 
-// Push constant structure for the ray tracer
+struct PushConstantMBlur
+{
+	float velocity_threshold;
+	float velocity_scale;
+	int tile_size;
+	int max_samples;
+	float soft_z_extent;
+	int alignmentTest;
+};
+
+// Push constant structure for the DoF Pass
 struct PushConstantDoF
 {
   float near_plane;
@@ -129,12 +139,25 @@ struct PushConstantDoF
   int alignmentTest;
 };
 
+// Push constant structure for the Tile Max pass
+struct PushConstantTileMax
+{
+	int tile_size;
+	float lens_diameter;
+	float focal_length;
+	float focal_distance;
+	int alignmentTest;
+};
+
+struct PushConstantNeighbourMax
+{
+	int tile_size;
+	int alignmentTest;
+};
+
 // Push constant structure for Debug buffer draw pass
 struct PushConstantDrawBuffer
 {
-	float near_plane;
-	float focal_plane;
-	float far_plane;
 	int draw_buffer;
 	int alignmentTest;
 };

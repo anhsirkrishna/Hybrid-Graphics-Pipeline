@@ -81,12 +81,6 @@ private:
 	DescriptorWrap m_post_proc_desc;
 	
 	//Resources required for the scanline render pass
-	/*ImageWrap m_sc_img_buffer;
-	vk::RenderPass m_scanline_renderpass;
-	vk::Framebuffer m_scanline_framebuffer;
-	DescriptorWrap m_scanline_desc;
-	vk::PipelineLayout m_scanline_pipeline_layout;
-	vk::Pipeline m_scanline_pipeline;*/
 
 	glm::mat4 m_prior_viewproj;
 

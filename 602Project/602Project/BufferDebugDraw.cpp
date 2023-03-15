@@ -184,9 +184,6 @@ BufferDebugDraw::BufferDebugDraw(Graphics* _p_gfx, RenderPass* p_prev_pass) :
     SetupFramebuffer();
     SetupDescriptor();
     SetupPipeline();
-    m_push_consts.near_plane = 1.0f;
-    m_push_consts.focal_plane = 3.0f;
-    m_push_consts.far_plane = 6.0f;
     m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
     m_push_consts.alignmentTest = 1234;
 }
@@ -194,6 +191,7 @@ BufferDebugDraw::BufferDebugDraw(Graphics* _p_gfx, RenderPass* p_prev_pass) :
 BufferDebugDraw::~BufferDebugDraw() {
     p_gfx->GetDeviceRef().destroyPipelineLayout(m_pipeline_layout);
     p_gfx->GetDeviceRef().destroyPipeline(m_pipeline);
+
     for (auto& framebuffer : m_framebuffers)
         p_gfx->GetDeviceRef().destroyFramebuffer(framebuffer);
     p_gfx->GetDeviceRef().destroyRenderPass(m_render_pass);
@@ -252,11 +250,11 @@ void BufferDebugDraw::SetVeloDepthBuffer(const ImageWrap& draw_buffer) {
     velo_depth_buffer_desc = draw_buffer.Descriptor();
 }
 
-void BufferDebugDraw::DrawGUI() {
-    ImGui::SliderFloat("X Focal plane : ", &m_push_consts.focal_plane, 0.0f, 10.0f);
-    ImGui::SliderFloat("X Near plane : ", &m_push_consts.near_plane, 0.0f, 10.0f);
-    ImGui::SliderFloat("X Far plane : ", &m_push_consts.far_plane, 0.0f, 10.0f);
+void BufferDebugDraw::SetTileMaxBuffer(const ImageWrap& draw_buffer) {
+    tile_max_buffer_desc = draw_buffer.Descriptor();
+}
 
+void BufferDebugDraw::DrawGUI() {
     if (ImGui::BeginMenu("Draw FBOs")) {
         if (ImGui::MenuItem("Disable", "", draw_buffer == DrawBuffer::DISABLE)) {
             draw_buffer = DrawBuffer::DISABLE;
@@ -272,6 +270,18 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::DEPTH;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(velo_depth_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw TileMax CoC Buffer", "", draw_buffer == DrawBuffer::TILEMAX_COC)) {
+            draw_buffer = DrawBuffer::TILEMAX_COC;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(tile_max_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw TileMax Velo Buffer", "", draw_buffer == DrawBuffer::TILEMAX_VELO)) {
+            draw_buffer = DrawBuffer::TILEMAX_VELO;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(tile_max_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         ImGui::EndMenu();

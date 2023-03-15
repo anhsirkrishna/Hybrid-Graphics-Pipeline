@@ -1,0 +1,41 @@
+#version 460
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shared_structs.h"
+
+layout(push_constant) uniform _pc_neighbour_max { PushConstantNeighbourMax pc; };
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 0, rgba32f) uniform image2D tile_max_buffer;
+layout(set = 0, binding = 1, rgba32f) uniform image2D neighbour_max_buffer;
+
+void main()
+{
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
+    if (pc.alignmentTest != 1234){
+        imageStore(tile_max_buffer, gpos, vec4(vec3(0, 1, 1), 1));
+        return;
+    }
+    ivec2 load_pos = gpos;
+    float min_depth = 1000.0f;
+    float max_coc = 0.0f;
+    vec2 max_velo = vec2(0.0f);
+    for (int i=-1; i <= 1; ++i) {
+        for (int j=-1; j <= 1; ++j) {
+            ivec2 it_load_pos = load_pos + ivec2(i, j);
+            vec4 tile_vel_depth = imageLoad(tile_max_buffer, it_load_pos);
+            //Depth is stored in the z component
+            min_depth = min(min_depth, tile_vel_depth.z);
+            //CoC radius is stored in the w component
+            max_coc = max(max_coc, tile_vel_depth.w);
+            //Velocity is stored in the xy component
+            if (length(max_velo) < length(tile_vel_depth.xy)) {
+                max_velo = tile_vel_depth.xy;
+            }
+        }
+    }
+
+    imageStore(tile_max_buffer, gpos, vec4(max_velo, min_depth, max_coc));
+}

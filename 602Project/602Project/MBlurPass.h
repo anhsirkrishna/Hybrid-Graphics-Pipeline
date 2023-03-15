@@ -1,9 +1,12 @@
 #pragma once
 #include "RenderPass.h"
-class TileMaxPass : public RenderPass{
+
+class MBlurPass : public RenderPass {
 private:
 	ImageWrap m_buffer;
 	void SetupBuffer();
+
+	PushConstantMBlur m_push_consts;
 
 	DescriptorWrap m_descriptor;
 	void SetupDescriptor();
@@ -12,19 +15,18 @@ private:
 	vk::Pipeline m_pipeline;
 	void SetupPipeline();
 
-	PushConstantTileMax m_push_consts;
-public:
-	TileMaxPass(Graphics* _p_gfx, RenderPass* p_prev_pass = nullptr);
-	~TileMaxPass();
+	bool enabled;
 
+	vk::DescriptorImageInfo neighbour_max_desc;
+public:
+	MBlurPass(Graphics* _p_gfx, RenderPass* p_prev_pass = nullptr);
+	~MBlurPass();
 	void Setup() override;
 	void Render() override;
 	void Teardown() override;
 
 	void DrawGUI();
 
-	const ImageWrap& GetBuffer() const;
-
-	static const int tile_size = 20;
+	void SetNeighbourMaxDesc(const ImageWrap& _buffer);
 };
 

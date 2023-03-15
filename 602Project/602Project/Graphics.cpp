@@ -8,6 +8,9 @@
 #include "DOFPass.h"
 #include "LightingPass.h"
 #include "BufferDebugDraw.h"
+#include "TileMaxPass.h"
+#include "NeighbourMax.h"
+#include "MBlurPass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -785,19 +788,31 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     CreatePostDescriptor(p_lighting_pass->GetBufferRef());
     CreatePostPipeline();
     
-    
+    //Add the TileMaxPass to the list of passes.
+    std::unique_ptr<TileMaxPass> p_tile_max_pass =
+        std::make_unique<TileMaxPass>(this, p_lighting_pass.get());
+
+    std::unique_ptr<NeighbourMax> p_neighbour_max_pass =
+        std::make_unique<NeighbourMax>(this, p_tile_max_pass.get());
 
     //Add the depth of field pass to the list of passes.
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_lighting_pass.get());
-    
+    p_dof_pass->SetTileMaxBufferDesc(p_tile_max_pass->GetBuffer());
+
+    //Add the MBlur pass to the list of passes.
+    std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
+    p_mblur_pass->SetNeighbourMaxDesc(p_neighbour_max_pass->GetBuffer());
 
     //Add the debug buffer draw pass to the list of passes.
     std::unique_ptr<BufferDebugDraw> p_debug_buffer_pass = 
         std::make_unique<BufferDebugDraw>(this, p_dof_pass.get());
     p_debug_buffer_pass->SetVeloDepthBuffer(p_lighting_pass->GetVeloDepthBufferRef());
+    p_debug_buffer_pass->SetTileMaxBuffer(p_tile_max_pass->GetBuffer());
 
     render_passes.push_back(std::move(p_lighting_pass));
+    render_passes.push_back(std::move(p_tile_max_pass));
     render_passes.push_back(std::move(p_dof_pass));
+    render_passes.push_back(std::move(p_mblur_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));
 
     //Setup all the render passes

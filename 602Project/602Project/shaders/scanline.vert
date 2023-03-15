@@ -26,6 +26,8 @@ layout(location = 1) out vec4 worldPos;
 layout(location = 2) out vec3 worldNrm;
 layout(location = 3) out vec3 viewDir;
 layout(location = 4) out vec2 texCoord;
+layout(location = 5) out vec4 currPos;
+layout(location = 6) out vec4 prevPos;
 
 out gl_PerVertex
 {
@@ -43,5 +45,7 @@ void main()
   worldNrm = mat3(pcRaster.modelMatrix) * i_normal;
 
   gl_Position = mats.viewProj * vec4(worldPos.xyz, 1.0);
+  prevPos = mats.priorViewProj * vec4(worldPos.xyz, 1.0);
+  currPos = gl_Position;
   worldPos.w = gl_Position.w;
 }

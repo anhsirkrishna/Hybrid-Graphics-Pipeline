@@ -23,6 +23,9 @@ layout(location=1) in vec4 worldPos;
 layout(location=2) in vec3 worldNrm;
 layout(location=3) in vec3 viewDir;
 layout(location=4) in vec2 texCoord;
+layout(location=5) in vec4 currPos;
+layout(location=6) in vec4 prevPos;
+
 // Outgoing
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec4 fragVeloDepth;
@@ -77,5 +80,7 @@ void main()
     brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
 
     fragColor.xyz = pcRaster.ambientLight*Kd + pcRaster.lightIntensity*NL*brdf;
-    fragVeloDepth = vec4(1, 0, 0 , worldPos.w);
+    vec2 velo = (currPos.xy / currPos.w) - (prevPos.xy / prevPos.w);
+    velo *= 0.5f;
+    fragVeloDepth = vec4(vec3(velo, 0.0f) , worldPos.w);
 }

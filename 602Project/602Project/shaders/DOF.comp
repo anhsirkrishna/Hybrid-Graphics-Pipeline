@@ -10,13 +10,14 @@ layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0) uniform sampler2D inImage;
 layout(set = 0, binding = 1, rgba32f) uniform image2D outImage;
 layout(set = 0, binding = 2) uniform sampler2D depthImage;
+layout(set = 0, binding = 3, rgba32f) uniform image2D tile_max_buffer;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
 int num_taps = 10;
 float POISSON[10] = float[10](2/10.0f, -3/10.0f, -8/10.0f, 5/10.0f, 3/10.0f, -5/10.0f, 2/10.0f, -4/10.0f, -3/10.0f, 4/10.0f);
 
-float coc_max = 15.0f;
+float coc_max = 35.0f;
 float coc_min = 5.0f;
 
 float ComputeDepthBlur(float depth) {
@@ -48,6 +49,8 @@ void main()
     float blur = ComputeDepthBlur(depth.r);
     float blur_radius = abs((blur * coc_max) - coc_min);
 
+    //blur_radius = texture(tile_max_buffer, uv).w;
+
     vec2 read_coords;
     float tap_depth;
     float tap_blur;
@@ -59,9 +62,7 @@ void main()
         tap_color = texture(inImage, read_coords);
         out_color.rgb += tap_color.rgb * tap_blur;
         out_color.a += tap_blur;
-
     }
 
-    //imageStore(outImage, gpos, vec4(ComputeDepthBlur(rel_depth)));
     imageStore(outImage, gpos, out_color / out_color.a);
 }

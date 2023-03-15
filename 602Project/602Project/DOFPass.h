@@ -17,6 +17,7 @@ private:
 	vk::Pipeline m_pipeline;
 	void SetupPipeline();
 
+	vk::DescriptorImageInfo tile_max_buffer_desc;
 public:
 	DOFPass(Graphics* _p_gfx, RenderPass* p_prev_pass=nullptr);
 	~DOFPass();
@@ -25,6 +26,7 @@ public:
 	void Teardown() override;
 
 	void WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info);
+	void SetTileMaxBufferDesc(const ImageWrap& buffer);
 
 	void DrawGUI();
 };

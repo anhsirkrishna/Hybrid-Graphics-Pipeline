@@ -65,6 +65,12 @@
     <ClCompile Include="TileMaxPass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="NeighbourMax.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="MBlurPass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -113,6 +119,12 @@
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
     <ClInclude Include="TileMaxPass.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="NeighbourMax.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="MBlurPass.h">
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
   </ItemGroup>
@@ -165,6 +177,15 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="shaders\BufferDebugDraw.vert">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\TileMax.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\NeighbourMax.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\MBlur.comp">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>
