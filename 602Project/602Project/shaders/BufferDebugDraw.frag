@@ -31,7 +31,7 @@ void main() {
     if (pcDebugBuffer.draw_buffer == 1)
     {
         //Draw the velocity buffer
-        fragColor   = vec4(texture(renderedImage, uv).xy + vec2(0.5), 0.0f, 1.0f);
+        fragColor   = vec4(texture(renderedImage, uv).xyz, 1.0f);
     }        
     else if (pcDebugBuffer.draw_buffer == 2)
     {
@@ -47,6 +47,16 @@ void main() {
     else if (pcDebugBuffer.draw_buffer == 4) 
     {
         //Draw the TILEMAX_VELO buffer
+        fragColor = vec4(texture(renderedImage, uv).rg, 0.0f, 1.0f);
+    }
+    else if (pcDebugBuffer.draw_buffer == 5) 
+    {
+        //Draw the NEIGHBOURMAX_COC buffer
+        fragColor = vec4(texture(renderedImage, uv).w);
+    }
+    else if (pcDebugBuffer.draw_buffer == 6) 
+    {
+        //Draw the NEIGHBOURMAX_VELO buffer
         fragColor = vec4(texture(renderedImage, uv).rg, 0.0f, 1.0f);
     }
 }

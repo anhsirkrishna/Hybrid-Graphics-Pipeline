@@ -808,9 +808,11 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
         std::make_unique<BufferDebugDraw>(this, p_dof_pass.get());
     p_debug_buffer_pass->SetVeloDepthBuffer(p_lighting_pass->GetVeloDepthBufferRef());
     p_debug_buffer_pass->SetTileMaxBuffer(p_tile_max_pass->GetBuffer());
+    p_debug_buffer_pass->SetNeighbourMaxBuffer(p_neighbour_max_pass->GetBuffer());
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));
+    render_passes.push_back(std::move(p_neighbour_max_pass));
     render_passes.push_back(std::move(p_dof_pass));
     render_passes.push_back(std::move(p_mblur_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));

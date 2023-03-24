@@ -18,6 +18,8 @@ private:
 	void SetupPipeline();
 
 	vk::DescriptorImageInfo tile_max_buffer_desc;
+
+	bool enabled;
 public:
 	DOFPass(Graphics* _p_gfx, RenderPass* p_prev_pass=nullptr);
 	~DOFPass();

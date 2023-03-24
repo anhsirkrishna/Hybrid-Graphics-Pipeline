@@ -48,10 +48,14 @@ void main()
   
     int               matIndex = matIndices.i[gl_PrimitiveID];
     Material mat      = materials.m[matIndex];
-  
+
+    float lightIntensity = 2.5f;
+    float ambientLight = 0.2f;
+    vec3 lightPosition = vec3( 0.5f, 2.5f, 3.0f );
+
     vec3 N = normalize(worldNrm);
     vec3 V = normalize(viewDir);
-    vec3 lDir = pcRaster.lightPosition - worldPos.xyz;
+    vec3 lDir = lightPosition - worldPos.xyz;
     vec3 L = normalize(lDir);
     vec3 H = normalize(L+V);
     
@@ -62,6 +66,8 @@ void main()
     vec3 Kd = mat.diffuse;
     vec3 Ks = mat.specular;
     const float alpha = mat.shininess;
+
+    float epsilon = 0.00001;
   
     if (mat.textureId >= 0)
     {
@@ -70,17 +76,28 @@ void main()
     Kd = texture(textureSamplers[nonuniformEXT(txtId)], texCoord).xyz;
     }
 
-    vec3 brdf;
-    float distribution;
+    float ag = sqrt(2 / (mat.shininess + 2));
+    float a_g2 = ag * ag; //2 / (alpha + 2);
+
+    // Phong
+    float d = (NH * NH) * (a_g2 - 1) + 1;
+    float D = a_g2 / (pi * d * d);
+
+    vec3 F = Ks + ((1.0 - Ks) * pow((1.0 - LH), 5));
+    float Vis = 1.0 / (LH * LH);
         
-    vec3 fresnel = Ks + ((vec3(1,1,1) - Ks)*pow((1-LH), 5));
-    float visibility = 1/(LH*LH);
+    // BRDF w/view term approximation
+    vec3 BRDF = (Kd / pi) + ((F * D * Vis) / 4);
 
-    distribution = ((alpha+2)/(2*pi))*pow(NH, alpha);
-    brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
+    fragColor.xyz = vec3((ambientLight * Kd) + (lightIntensity * NL * BRDF)); 
 
-    fragColor.xyz = pcRaster.ambientLight*Kd + pcRaster.lightIntensity*NL*brdf;
-    vec2 velo = (currPos.xy / currPos.w) - (prevPos.xy / prevPos.w);
-    velo *= 0.5f;
-    fragVeloDepth = vec4(vec3(velo, 0.0f) , worldPos.w);
+    ivec2 img_space_curr = ivec2((((currPos.xy / currPos.w) * 0.5) + 0.5) * pcRaster.window_size);
+    ivec2 img_space_prev = ivec2((((prevPos.xy / prevPos.w) * 0.5) + 0.5) * pcRaster.window_size);
+    vec2 velo = img_space_curr - img_space_prev;
+    velo = velo * pcRaster.exposure_time * pcRaster.frame_rate;
+    vec2 pixel_size = 1.0f / pcRaster.window_size;
+    vec2 half_pixel_size = 0.5f * pixel_size;
+    vec2 out_velo = (velo * max(length(half_pixel_size), min(length(velo), pcRaster.tile_size))) 
+                    / (length(velo) + epsilon); 
+    fragVeloDepth = vec4(vec3(out_velo, 0.0f) , worldPos.w);
 }

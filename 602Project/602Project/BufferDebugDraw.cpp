@@ -1,6 +1,7 @@
 #include "Graphics.h"
 
 #include "BufferDebugDraw.h"
+#include "TileMaxPass.h"
 
 void BufferDebugDraw::SetupDescriptor() {
     m_descriptor.setBindings(p_gfx->GetDeviceRef(), {
@@ -185,6 +186,7 @@ BufferDebugDraw::BufferDebugDraw(Graphics* _p_gfx, RenderPass* p_prev_pass) :
     SetupDescriptor();
     SetupPipeline();
     m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+    m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.alignmentTest = 1234;
 }
 
@@ -254,6 +256,10 @@ void BufferDebugDraw::SetTileMaxBuffer(const ImageWrap& draw_buffer) {
     tile_max_buffer_desc = draw_buffer.Descriptor();
 }
 
+void BufferDebugDraw::SetNeighbourMaxBuffer(const ImageWrap& draw_buffer) {
+    neighbour_max_buffer_desc = draw_buffer.Descriptor();
+}
+
 void BufferDebugDraw::DrawGUI() {
     if (ImGui::BeginMenu("Draw FBOs")) {
         if (ImGui::MenuItem("Disable", "", draw_buffer == DrawBuffer::DISABLE)) {
@@ -282,6 +288,18 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::TILEMAX_VELO;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(tile_max_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw NeighbourMax COC Buffer", "", draw_buffer == DrawBuffer::NEIGHBOURMAX_COC)) {
+            draw_buffer = DrawBuffer::NEIGHBOURMAX_COC;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(neighbour_max_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw NeighbourMaxVelo Buffer", "", draw_buffer == DrawBuffer::NEIGHBOURMAX_VELO)) {
+            draw_buffer = DrawBuffer::NEIGHBOURMAX_VELO;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(neighbour_max_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         ImGui::EndMenu();

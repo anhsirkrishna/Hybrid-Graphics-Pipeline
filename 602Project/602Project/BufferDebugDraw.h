@@ -10,12 +10,15 @@ public:
 		VELOCITY,
 		DEPTH,
 		TILEMAX_COC,
-		TILEMAX_VELO
+		TILEMAX_VELO,
+		NEIGHBOURMAX_COC,
+		NEIGHBOURMAX_VELO
 	};
 
 private:
 	vk::DescriptorImageInfo velo_depth_buffer_desc;
 	vk::DescriptorImageInfo tile_max_buffer_desc;
+	vk::DescriptorImageInfo neighbour_max_buffer_desc;
 	void SetDrawBuffer(vk::DescriptorImageInfo& draw_descriptor);
 
 	DescriptorWrap m_descriptor;
@@ -43,6 +46,7 @@ public:
 
 	void SetVeloDepthBuffer(const ImageWrap& draw_buffer);
 	void SetTileMaxBuffer(const ImageWrap& draw_buffer);
+	void SetNeighbourMaxBuffer(const ImageWrap& draw_buffer);
 
 	void DrawGUI();
 };

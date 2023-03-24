@@ -15,7 +15,7 @@ void main()
 {
     ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
     if (pc.alignmentTest != 1234){
-        imageStore(tile_max_buffer, gpos, vec4(vec3(0, 1, 1), 1));
+        imageStore(neighbour_max_buffer, gpos, vec4(vec3(0, 1, 1), 1));
         return;
     }
     ivec2 load_pos = gpos;
@@ -37,5 +37,5 @@ void main()
         }
     }
 
-    imageStore(tile_max_buffer, gpos, vec4(max_velo, min_depth, max_coc));
+    imageStore(neighbour_max_buffer, gpos, vec4(max_velo, min_depth, max_coc));
 }

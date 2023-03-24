@@ -1,6 +1,7 @@
 #include "Graphics.h"
 
 #include "LightingPass.h"
+#include "TileMaxPass.h"
 
 void LightingPass::SetupBuffer() {
     m_buffer.CreateTextureSampler();
@@ -291,6 +292,11 @@ LightingPass::LightingPass(Graphics* _p_gfx) : RenderPass(_p_gfx),
     SetupFramebuffer();
     SetupDescriptor();
     SetupPipeline();
+
+    m_push_consts.exposure_time = 1.0f / 144;
+    m_push_consts.exposure_time = 100.0f;
+    m_push_consts.window_size = p_gfx->GetWindowSize();
+    m_push_consts.tile_size = TileMaxPass::tile_size;
 }
 
 LightingPass::~LightingPass() {
@@ -336,25 +342,17 @@ void LightingPass::Render() {
         m_pipeline_layout, 0, 1,
         &m_descriptor.descSet, 0, nullptr);
 
+
+    m_push_consts.frame_rate = 1.0f/ImGui::GetIO().Framerate;
     for (const ObjInst& inst : p_gfx->m_objInst) {
         auto& object = p_gfx->m_objData[inst.objIndex];
 
-        // Information pushed at each draw call
-        PushConstantRaster pcRaster{
-            inst.transform,      // Object's instance transform.
-            {0.5f, 2.5f, 3.0f},  // light position;  Should not be hard-coded here!
-            inst.objIndex,       // instance Id
-            2.5f,                 // light intensity;  Should not be hard-coded here!
-            1,                   //Light Type ?
-            0.2f                 //Ambient light 
-        };
-
-        pcRaster.objIndex = inst.objIndex;  // Telling which object is drawn
-        pcRaster.modelMatrix = inst.transform;
+        m_push_consts.modelMatrix = inst.transform;
+        m_push_consts.objIndex = inst.objIndex;
 
         gfx_command_buffer.pushConstants(m_pipeline_layout,
             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0,
-            sizeof(PushConstantRaster), &pcRaster);
+            sizeof(PushConstantRaster), &m_push_consts);
 
         gfx_command_buffer.bindVertexBuffers(0, 1, &object.vertexBuffer.buffer, &offset);
         gfx_command_buffer.bindIndexBuffer(object.indexBuffer.buffer, 0, vk::IndexType::eUint32);
@@ -364,9 +362,13 @@ void LightingPass::Render() {
 }
 
 void LightingPass::Teardown() {
+    
 }
 
 void LightingPass::DrawGUI() {
+    ImGui::SliderFloat("Exposure time : ", &m_push_consts.exposure_time,
+        1.0f, 100.0f);
+    ImGui::Text("frame rate : %f", m_push_consts.frame_rate);
 }
 
 const ImageWrap& LightingPass::GetBufferRef() const {

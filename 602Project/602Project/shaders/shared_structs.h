@@ -68,11 +68,12 @@ struct MatrixUniforms
 struct PushConstantRaster
 {
   mat4  modelMatrix;  // matrix of the instance
-  vec3  lightPosition;
+  vec4 lightPosition;
+  vec2 window_size;
   uint  objIndex;
-  float lightIntensity;
-  int   lightType;
-  float ambientLight;
+  float exposure_time;
+  float frame_rate;
+  int tile_size;
 };
 
 
@@ -125,6 +126,7 @@ struct PushConstantMBlur
 	int tile_size;
 	int max_samples;
 	float soft_z_extent;
+	int curr_s;
 	int alignmentTest;
 };
 
@@ -159,6 +161,7 @@ struct PushConstantNeighbourMax
 struct PushConstantDrawBuffer
 {
 	int draw_buffer;
+	int tile_size;
 	int alignmentTest;
 };
 

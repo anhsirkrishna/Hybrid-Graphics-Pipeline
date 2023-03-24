@@ -4,6 +4,7 @@
 #include "TileMaxPass.h"
 
 void NeighbourMax::SetupBuffer() {
+    m_buffer.CreateTextureSampler();
 	m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
@@ -53,6 +54,7 @@ NeighbourMax::NeighbourMax(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
              p_gfx->GetWindowSize().y / TileMaxPass::tile_size,
     vk::Format::eR32G32B32A32Sfloat,
     vk::ImageUsageFlagBits::eTransferDst |
+    vk::ImageUsageFlagBits::eSampled |
     vk::ImageUsageFlagBits::eStorage |
     vk::ImageUsageFlagBits::eTransferSrc |
     vk::ImageUsageFlagBits::eColorAttachment,
@@ -112,7 +114,7 @@ void NeighbourMax::Render() {
         &m_descriptor.descSet, 0, nullptr);
     p_gfx->GetCommandBuffer().pushConstants(m_pipeline_layout,
         vk::ShaderStageFlagBits::eCompute, 0,
-        sizeof(PushConstantTileMax),
+        sizeof(PushConstantNeighbourMax),
         &m_push_consts);
 
     p_gfx->GetCommandBuffer().dispatch(

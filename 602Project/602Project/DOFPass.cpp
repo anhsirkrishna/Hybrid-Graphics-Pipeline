@@ -19,6 +19,7 @@ void DOFPass::SetTileMaxBufferDesc(const ImageWrap& buffer) {
 }
 
 void DOFPass::DrawGUI() {
+    ImGui::Checkbox("DOF Enabled", &enabled);
     ImGui::SliderFloat("Far plane : ", &m_push_consts.far_plane, 
         m_push_consts.focal_plane, 5.0f);
     ImGui::SliderFloat("Focal plane : ", &m_push_consts.focal_plane, 
@@ -81,7 +82,7 @@ m_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
     vk::ImageUsageFlagBits::eColorAttachment, 
     vk::ImageAspectFlagBits::eColor, 
     vk::MemoryPropertyFlagBits::eDeviceLocal, 
-    1, p_gfx), m_push_consts() {
+    1, p_gfx), m_push_consts(), enabled(true) {
     m_push_consts.near_plane = 0.3f;
     m_push_consts.focal_plane = 2.0f;
     m_push_consts.far_plane = 3.8f;
@@ -110,6 +111,9 @@ void DOFPass::Setup() {
 }
 
 void DOFPass::Render() {
+    if (not enabled)
+        return;
+
     LightingPass* p_prev_lighting_pass = static_cast<LightingPass*>(p_prev_pass);
     vk::ImageSubresourceRange range;
     range.setAspectMask(vk::ImageAspectFlagBits::eColor);

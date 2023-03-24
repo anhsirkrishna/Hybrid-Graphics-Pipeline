@@ -65,11 +65,12 @@ MBlurPass::MBlurPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         1, p_gfx), enabled(true) {
-    m_push_consts.velocity_scale = 1.0f;
+    m_push_consts.velocity_scale = 20.0f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.velocity_threshold = 0.0f;
     m_push_consts.max_samples = 20;
     m_push_consts.soft_z_extent = 0.01;
+    m_push_consts.curr_s = 0;
     m_push_consts.alignmentTest = 1234;
 
     SetupBuffer();
@@ -92,7 +93,7 @@ void MBlurPass::Setup() {
     m_descriptor.write(p_gfx->GetDeviceRef(), 2,
         static_cast<LightingPass*>(p_prev_pass)->GetVeloDepthBufferRef().Descriptor());
     m_descriptor.write(p_gfx->GetDeviceRef(), 3,
-        static_cast<LightingPass*>(p_prev_pass)->GetVeloDepthBufferRef().Descriptor());
+        neighbour_max_desc);
     SetupPipeline();
 }
 
@@ -156,13 +157,16 @@ void MBlurPass::Teardown()
 
 void MBlurPass::DrawGUI() {
     ImGui::SliderFloat("Velocity scale: ", &m_push_consts.velocity_scale,
-        1.0f, 5.0f);
+        1.0f, 20.0f);
 
     ImGui::SliderFloat("Velocity threshold: ", &m_push_consts.velocity_threshold,
         0.0f, 5.0f);
 
     ImGui::SliderInt("Velocity max sample count: ", &m_push_consts.max_samples,
         1, 50);
+
+    ImGui::SliderInt("Curr S : ", &m_push_consts.curr_s,
+        0, 50);
 
     ImGui::SliderFloat("Soft Z extent: ", &m_push_consts.soft_z_extent,
         0.01f, 0.1f);
