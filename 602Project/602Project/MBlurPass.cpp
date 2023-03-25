@@ -67,7 +67,6 @@ MBlurPass::MBlurPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
         1, p_gfx), enabled(true) {
     m_push_consts.velocity_scale = 20.0f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
-    m_push_consts.velocity_threshold = 0.0f;
     m_push_consts.max_samples = 20;
     m_push_consts.soft_z_extent = 0.01;
     m_push_consts.alignmentTest = 1234;
@@ -157,9 +156,6 @@ void MBlurPass::Teardown()
 void MBlurPass::DrawGUI() {
     ImGui::SliderFloat("Velocity scale: ", &m_push_consts.velocity_scale,
         1.0f, 20.0f);
-
-    ImGui::SliderFloat("Velocity threshold: ", &m_push_consts.velocity_threshold,
-        0.0f, 5.0f);
 
     ImGui::SliderInt("Velocity max sample count: ", &m_push_consts.max_samples,
         1, 50);

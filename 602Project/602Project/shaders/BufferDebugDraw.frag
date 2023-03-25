@@ -59,4 +59,24 @@ void main() {
         //Draw the NEIGHBOURMAX_VELO buffer
         fragColor = vec4(texture(renderedImage, uv).rg, 0.0f, 1.0f);
     }
+    else if (pcDebugBuffer.draw_buffer == 7)
+    {
+        //Draw the downscaled filtered pre dof buffer
+        fragColor = vec4(texture(renderedImage, uv).rgb, 1.0f);
+    }
+    else if (pcDebugBuffer.draw_buffer == 8)
+    {
+        //Draw the downscaled filtered pre dof COC buffer
+        fragColor = vec4(texture(renderedImage, uv).r, 0.0f, 0.0f, 1.0f);
+    }
+    else if (pcDebugBuffer.draw_buffer == 9)
+    {
+        //Draw the downscaled filtered pre dof BG buffer
+        fragColor = vec4(0.0f, texture(renderedImage, uv).g, 0.0f, 1.0f);
+    }
+    else if (pcDebugBuffer.draw_buffer == 10)
+    {
+        //Draw the downscaled filtered pre dof FG buffer
+        fragColor = vec4(0.0f, 0.0f, texture(renderedImage, uv).b, 1.0f);
+    }
 }

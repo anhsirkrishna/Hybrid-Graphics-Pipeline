@@ -1,0 +1,163 @@
+#version 460
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shared_structs.h"
+
+#define DOF_SINGLE_PIXEL_RADIUS 0.7071
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform image2D out_image;
+layout(set = 0, binding = 1, rgba32f) uniform image2D out_params;
+layout(set = 0, binding = 2, rgba32f) uniform image2D color_buffer;
+layout(set = 0, binding = 3, rgba32f) uniform image2D vel_depth_buffer;
+layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
+
+layout(push_constant) uniform _pc_DOF { PushConstantPreDoF pc; };
+
+float PI = 3.14159;
+const float s = 0.01;
+const float epsilon = 0.000001;
+
+float g_kernel[3][3] = {
+    {0.075, 0.124, 0.075},
+    {0.124, 0.204, 0.124},
+    {0.075, 0.124, 0.075}
+};
+
+//The following function is from Shirley 1997
+vec2 ToUnitDisk(vec2 onSquare) {
+    float phi, r, u, v;
+    float a = 2 * onSquare.x - 1;
+    float b = 2 * onSquare.y - 1;
+
+    if (a > -b) 
+    {
+        if (a > b)
+        {
+            r = a;
+            phi = (PI/4) * (b/a);
+        }
+        else
+        {
+            r = b;
+            phi = (PI/4) * (2 - (a/b));
+        }
+    }
+    else
+    {
+        if (a < b)
+        {
+            r = -a;
+            phi = (PI/4) * (4 + (b/a));
+        }
+        else
+        {
+            r = -b;
+            if (b != 0)
+                phi = (PI/4) * (6 - (a/b));
+            else
+                phi = 0;
+        }
+    }
+    u = r * cos(phi);
+    v = r * sin(phi);
+    return vec2(u,v);
+}
+
+//The following equation is from Potmesil 1981
+float CaclulateCoCDiameter(float depth) {
+    float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) * 
+                ( abs(depth - pc.focal_distance) / depth );
+    return Cr * pc.coc_sample_scale;
+}
+
+//The following functions are from Jiminez 2014
+vec2 DepthCompare(float depth, float min_depth) {
+    float d = pc.depth_scale_fg * (depth - min_depth);
+    vec2 depthCmp;
+    depthCmp.x = smoothstep(0.0f, 1.0f, d); //Background
+    depthCmp.y = 1.0f - depthCmp.x; //Foregroun d
+
+    return depthCmp;
+}
+
+float SampleAlpha(float sample_coc) {
+    return min( 1.0f / (PI * sample_coc * sample_coc),
+                1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
+}
+
+void main()
+{
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
+
+    //First downscale to half res.
+    ivec2 downscale_load_pos = gpos * 2;
+    float max_depth = 0.0f;
+    vec3 downscale_color = vec3(0.0f);
+    for(int i = 0; i < 2; ++i) {
+        for(int j = 0; j < 2; ++j) {
+           ivec2 load_pos = downscale_load_pos + ivec2(i, j);
+           downscale_color += imageLoad(color_buffer, load_pos).rgb;
+           max_depth = max(max_depth, imageLoad(vel_depth_buffer, load_pos).w);
+        }
+    }
+    //Average the downscale_color
+    downscale_color = downscale_color/4;
+    imageStore(out_image, gpos, vec4(downscale_color, max_depth));
+    barrier();
+
+    //Next prefilter using 9-tap bilateral filter
+    float coc = CaclulateCoCDiameter(max_depth);
+    float coc_radius = coc / 2;
+
+    vec2 pixel_size = 1.0f / vec2(imageSize(out_image));
+    vec2 half_px = 0.5*pixel_size;
+
+    float R;
+    float curr_depth = max_depth;
+    float weight_sums = 0.0f;
+    vec3 color_sum = vec3(0.0f);
+    for(int i = 0; i < 3; ++i) {
+        for(int j = 0; j < 3; ++j) {
+            //Filter tap using circular kernel
+            float x = float(i) / 3;
+            float y = float(j) / 3;
+            vec2 circle_tap = ToUnitDisk(vec2(x, y));
+            vec2 tap_pos = (1.0f/6) * coc_radius * circle_tap;
+
+            ivec2 load_pos = ivec2(vec2(gpos) + tap_pos + half_px);
+            vec4 color_depth = imageLoad(out_image, load_pos);
+            float sample_depth = color_depth.w;
+
+            R = (1/sqrt(2*PI*s)) * 
+                exp(-((sample_depth - curr_depth)*(sample_depth - curr_depth))/2*s);
+            float sample_weight = (g_kernel[i][j] * R);
+		    weight_sums += sample_weight;
+		    color_sum += (color_depth.rgb * sample_weight);
+        }
+    }
+    
+    if (weight_sums <= 0)
+        imageStore(out_image, gpos, vec4(vec3(0.0f), 1.0f));
+    else
+        imageStore(out_image, gpos, vec4(color_sum/weight_sums, 1.0f));
+
+    barrier();
+    //Finally perform the presorting based on background/foreground depth comparisions.
+    //Min Neighbourhood depth is stored in the z component of the NeighbourMax buffer
+    float neighbour_min_depth = 
+        imageLoad(neighbour_max_buffer, ivec2(downscale_load_pos/pc.tile_size)).z;
+    
+    vec2 depth_cmp = DepthCompare(max_depth, neighbour_min_depth);
+    float sample_alpha = SampleAlpha(coc_radius);
+    vec4 params;
+    params.r = coc_radius;
+    params.g = sample_alpha * depth_cmp.x;
+    params.b = sample_alpha * depth_cmp.y;
+    params.a = 1.0f;
+
+    imageStore(out_params, gpos, params);
+}

@@ -71,6 +71,9 @@
     <ClCompile Include="MBlurPass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="PreDOFPass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -125,6 +128,9 @@
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
     <ClInclude Include="MBlurPass.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="PreDOFPass.h">
       <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
   </ItemGroup>
@@ -189,6 +195,9 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="shaders\DOF_primitive.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\PreDOF.comp">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>

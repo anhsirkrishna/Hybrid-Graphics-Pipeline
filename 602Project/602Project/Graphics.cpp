@@ -11,6 +11,7 @@
 #include "TileMaxPass.h"
 #include "NeighbourMax.h"
 #include "MBlurPass.h"
+#include "PreDOFPass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -526,7 +527,9 @@ void Graphics::CreatePostFrameBuffers() {
 
 void Graphics::CreatePostDescriptor(const ImageWrap& scanline_buffer) {
     m_post_proc_desc.setBindings(m_device, {
-            {0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
+            {0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+            {1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+            {2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
         });
     m_post_proc_desc.write(m_device, 0, scanline_buffer.Descriptor());
 }
@@ -795,12 +798,20 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     std::unique_ptr<NeighbourMax> p_neighbour_max_pass =
         std::make_unique<NeighbourMax>(this, p_tile_max_pass.get());
 
+    //Add the pre DOF pass
+    std::unique_ptr<PreDOFPass> p_pre_dof_pass = 
+        std::make_unique<PreDOFPass>(this, p_lighting_pass.get());
+    p_pre_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
+
     //Add the depth of field pass to the list of passes.
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_lighting_pass.get());
     p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
 
     //Make sure TileMaxPass can access DOFPass for the DOF parameters
     p_tile_max_pass->SetDOFPass(p_dof_pass.get());
+
+    //Make sure PreDOFPass can access DOFPass for the DOF parameters
+    p_pre_dof_pass->SetDOFPass(p_dof_pass.get());
 
     //Add the MBlur pass to the list of passes.
     std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
@@ -812,10 +823,13 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetVeloDepthBuffer(p_lighting_pass->GetVeloDepthBufferRef());
     p_debug_buffer_pass->SetTileMaxBuffer(p_tile_max_pass->GetBuffer());
     p_debug_buffer_pass->SetNeighbourMaxBuffer(p_neighbour_max_pass->GetBuffer());
+    p_debug_buffer_pass->SetPreDOFBuffer(p_pre_dof_pass->GetBuffer());
+    p_debug_buffer_pass->SetPreDOFParamsBuffer(p_pre_dof_pass->GetParamsBuffer());
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));
     render_passes.push_back(std::move(p_neighbour_max_pass));
+    render_passes.push_back(std::move(p_pre_dof_pass));
     render_passes.push_back(std::move(p_dof_pass));
     render_passes.push_back(std::move(p_mblur_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));

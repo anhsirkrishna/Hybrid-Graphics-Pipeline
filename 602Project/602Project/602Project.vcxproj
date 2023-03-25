@@ -102,6 +102,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MBlurPass.cpp" />
     <ClCompile Include="NeighbourMax.cpp" />
+    <ClCompile Include="PreDOFPass.cpp" />
     <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="ScanlineGraphics.cpp" />
     <ClCompile Include="TileMaxPass.cpp" />
@@ -122,6 +123,7 @@
     <ClInclude Include="LightingPass.h" />
     <ClInclude Include="MBlurPass.h" />
     <ClInclude Include="NeighbourMax.h" />
+    <ClInclude Include="PreDOFPass.h" />
     <ClInclude Include="RenderPass.h" />
     <ClInclude Include="shaders\shared_structs.h" />
     <ClInclude Include="TileMaxPass.h" />
@@ -221,6 +223,15 @@
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
     </CustomBuild>
     <CustomBuild Include="shaders\DOF_primitive.comp">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\PreDOF.comp">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>

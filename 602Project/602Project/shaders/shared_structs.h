@@ -121,11 +121,22 @@ struct Material  // Created by readModel; used in shaders
 
 struct PushConstantMBlur
 {
-	float velocity_threshold;
 	float velocity_scale;
 	int tile_size;
 	int max_samples;
 	float soft_z_extent;
+	int alignmentTest;
+};
+
+// Push constant structure for the Pre DoF Pass
+struct PushConstantPreDoF
+{
+	float focal_length;
+	float focal_distance;
+	float lens_diameter;
+	float depth_scale_fg;
+	float coc_sample_scale;
+	int tile_size;
 	int alignmentTest;
 };
 
@@ -135,8 +146,7 @@ struct PushConstantDoF
   float focal_length;
   float focal_distance;
   float lens_diameter;
-  float max_depth;
-  float soft_z_extent;
+  float depth_scale_fg;
   float coc_sample_scale;
   int tile_size;
   int alignmentTest;

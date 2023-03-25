@@ -9,10 +9,10 @@ const int GROUP_SIZE = 128;
 layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, rgba32f) uniform image2D out_image_bg;
-layout(set = 0, binding = 0, rgba32f) uniform image2D out_image_fg;
-layout(set = 0, binding = 1, rgba32f) uniform image2D color_buffer;
-layout(set = 0, binding = 2, rgba32f) uniform image2D vel_depth_buffer;
-layout(set = 0, binding = 3, rgba32f) uniform image2D neighbour_max_buffer;
+layout(set = 0, binding = 1, rgba32f) uniform image2D out_image_fg;
+layout(set = 0, binding = 2, rgba32f) uniform image2D color_buffer;
+layout(set = 0, binding = 3, rgba32f) uniform image2D vel_depth_buffer;
+layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
@@ -67,7 +67,7 @@ float CaclulateCoCDiameter(float depth) {
 
 //The following functions are from McGuire 2012
 float softDepthCompare(float depth1, float depth2) {
-    return clamp(1 - (depth1 - depth2) / pc.soft_z_extent, 0, 1);
+    return clamp(1 - (depth1 - depth2) / pc.depth_scale_fg, 0, 1);
 }
 
 float cone(vec2 X, vec2 Y, float depth) {
@@ -83,11 +83,6 @@ float cylinder(vec2 X, vec2 Y, float depth) {
 void main()
 {
     ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
-
-    if (pc.alignmentTest != 1234){
-        imageStore(out_image, gpos, vec4(vec3(0, 1, 1), 1));
-        return;
-    }
 
     vec2 pixel_size = 1.0f / vec2(imageSize(color_buffer));
     vec2 half_px = 0.5*pixel_size;
@@ -106,7 +101,7 @@ void main()
     out_color *= weight;
 
     int max_rings = 3;
-    float coc_radius = neighbour_coc / 2;
+    float coc_radius = CaclulateCoCDiameter(curr_vel_depth.w) / 2;
     for (int i=1; i <=max_rings ; ++i ) {
         int taps = i*8;
         for (int j = 0; j <= taps ; j+=4) {
@@ -126,17 +121,11 @@ void main()
                 vec4 sample_vel_depth = imageLoad(vel_depth_buffer, load_pos);
 
                 //Foreground vs background classification
-//                float fg = softDepthCompare(curr_vel_depth.w, sample_vel_depth.w);
-//                float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
-//
-//                float alpha = (fg * cone(load_pos, gpos, sample_vel_depth.w)) +
-//                              (bg * cone(gpos, load_pos, curr_vel_depth.w)) +
-//                              (cylinder(load_pos, gpos, sample_vel_depth.w) * cylinder(gpos, load_pos, curr_vel_depth.w) * 2);
-                
+                float fg = softDepthCompare(curr_vel_depth.w, sample_vel_depth.w);
                 float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
 
-                float alpha = 
-                              (bg * cone(gpos, load_pos, curr_vel_depth.w)) +
+                float alpha = (fg * cone(load_pos, gpos, curr_vel_depth.w)) +
+                              (bg * cone(gpos, load_pos, sample_vel_depth.w)) +
                               (cylinder(load_pos, gpos, sample_vel_depth.w) * cylinder(gpos, load_pos, curr_vel_depth.w) * 2);
 
                 weight += alpha;
@@ -145,5 +134,6 @@ void main()
         }
     }
 
-    imageStore(out_image, gpos, out_color / weight);
+    imageStore(out_image_bg, gpos, out_color / weight);
+    imageStore(out_image_fg, gpos, vec4(0.0f, 0.0f, 1.0f, 0.0f));
 }
