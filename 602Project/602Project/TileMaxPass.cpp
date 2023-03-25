@@ -2,6 +2,7 @@
 
 #include "TileMaxPass.h"
 #include "LightingPass.h"
+#include "DOFPass.h"
 
 void TileMaxPass::SetupBuffer() {
 	m_buffer.CreateTextureSampler();
@@ -63,9 +64,6 @@ m_buffer(p_gfx->GetWindowSize().x/ tile_size, p_gfx->GetWindowSize().y / tile_si
     SetupDescriptor();
 
     m_push_consts.tile_size = tile_size;
-    m_push_consts.lens_diameter = 0.1f;
-    m_push_consts.focal_length = 0.1f;
-    m_push_consts.focal_distance = 1.0f;
     m_push_consts.alignmentTest = 1234;
 }
 
@@ -85,6 +83,12 @@ void TileMaxPass::Setup() {
 }
 
 void TileMaxPass::Render() {
+    //Set the push consts based on DOF params
+    m_push_consts.coc_sample_scale = p_dof_pass->GetDOFParams().coc_sample_scale;
+    m_push_consts.focal_length = p_dof_pass->GetDOFParams().focal_length;
+    m_push_consts.focal_distance = p_dof_pass->GetDOFParams().focal_distance;
+    m_push_consts.lens_diameter = p_dof_pass->GetDOFParams().lens_diameter;
+
     LightingPass* p_prev_lighting_pass = static_cast<LightingPass*>(p_prev_pass);
     vk::ImageSubresourceRange range;
     range.setAspectMask(vk::ImageAspectFlagBits::eColor);
@@ -135,14 +139,13 @@ void TileMaxPass::Teardown() {
 }
 
 void TileMaxPass::DrawGUI() {
-    /*ImGui::SliderFloat("Focal Distance : ", &m_push_consts.focal_distance,
-        0.1f, 5.0f);
-    ImGui::SliderFloat("Focal length : ", &m_push_consts.focal_length,
-        0.1f, 1.0f);
-    ImGui::SliderFloat("Lens Diameter : ", &m_push_consts.lens_diameter,
-        0.1f, 0.5f);*/
+    
 }
 
 const ImageWrap& TileMaxPass::GetBuffer() const {
     return m_buffer;
+}
+
+void TileMaxPass::SetDOFPass(DOFPass* _p_dof_pass) {
+    p_dof_pass = _p_dof_pass;
 }

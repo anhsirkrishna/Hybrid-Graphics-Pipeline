@@ -1,43 +1,78 @@
 #include "ImageWrap.h"
 #include "DescriptorWrap.h"
 #include "Graphics.h"
+#include "Camera.h"
 
 #include "DOFPass.h"
 #include "LightingPass.h"
+#include "TileMaxPass.h"
 
 void DOFPass::SetupBuffer() {
-    m_buffer.CreateTextureSampler();
-    m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+    m_buffer_bg.CreateTextureSampler();
+    m_buffer_bg.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_buffer_fg.CreateTextureSampler();
+    m_buffer_fg.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void DOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info) {
     m_descriptor.write(p_gfx->GetDeviceRef(), index, img_desc_info);
 }
 
-void DOFPass::SetTileMaxBufferDesc(const ImageWrap& buffer) {
-    tile_max_buffer_desc = buffer.Descriptor();
+void DOFPass::SetNeighbourMaxBufferDesc(const ImageWrap& buffer) {
+    neighbour_max_buffer_desc = buffer.Descriptor();
+}
+
+const PushConstantDoF& DOFPass::GetDOFParams() {
+    return m_push_consts;
+}
+
+const ImageWrap& DOFPass::GetBGBuffer() const {
+    return m_buffer_bg;
+}
+
+const ImageWrap& DOFPass::GetFGBuffer() const {
+    return m_buffer_fg;
 }
 
 void DOFPass::DrawGUI() {
     ImGui::Checkbox("DOF Enabled", &enabled);
-    ImGui::SliderFloat("Far plane : ", &m_push_consts.far_plane, 
-        m_push_consts.focal_plane, 5.0f);
-    ImGui::SliderFloat("Focal plane : ", &m_push_consts.focal_plane, 
-        m_push_consts.near_plane, m_push_consts.far_plane);
-    ImGui::SliderFloat("Near plane : ", &m_push_consts.near_plane, 
-        0.0f, m_push_consts.focal_plane);
+    ImGui::SliderFloat("CoC sample scale : ", &m_push_consts.coc_sample_scale,
+        0.0f, 1000.0f);
+    ImGui::SliderFloat("Focal Distance : ", &m_push_consts.focal_distance,
+        0.1f, 10.0f);
+    ImGui::SliderFloat("Focal length : ", &m_push_consts.focal_length,
+        0.01f, 0.09f);
+    ImGui::SliderFloat("Lens Diameter : ", &m_push_consts.lens_diameter,
+        0.01f, 0.2f);
+
+    //Set the position of the camera to demonstrate DOF
+    if (ImGui::Button("Set DOF Eye Pos")) {
+        p_gfx->GetCamera()->SetEyePos(vec3(1.9739350, 1.014416, -1.624937));
+        p_gfx->GetCamera()->SetSpin(-44);
+        p_gfx->GetCamera()->SetTilt(20);
+    }
+
+    //Set the position of the camera to demonstrate DOF
+    if (ImGui::Button("Set DOF Eye Pos 2")) {
+        p_gfx->GetCamera()->SetEyePos(vec3(2.009752, 0.771944, -1.423020));
+        p_gfx->GetCamera()->SetSpin(-44);
+        p_gfx->GetCamera()->SetTilt(20);
+    }
 }
 
 void DOFPass::SetupDescriptor() {
     m_descriptor.setBindings(p_gfx->GetDeviceRef(), {
-        {0, vk::DescriptorType::eCombinedImageSampler, 1,
+        {0, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {1, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
-        {2, vk::DescriptorType::eCombinedImageSampler, 1,
+        {2, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {3, vk::DescriptorType::eStorageImage, 1,
-         vk::ShaderStageFlagBits::eCompute} });
+         vk::ShaderStageFlagBits::eCompute},
+        {4, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute}, });
 }
 
 void DOFPass::SetupPipeline() {
@@ -73,21 +108,33 @@ void DOFPass::SetupPipeline() {
 }
 
 DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx, _p_prev_pass),
-m_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
-	vk::Format::eR32G32B32A32Sfloat, 
-    vk::ImageUsageFlagBits::eTransferDst |
-    vk::ImageUsageFlagBits::eSampled |
-    vk::ImageUsageFlagBits::eStorage |
-    vk::ImageUsageFlagBits::eTransferSrc |
-    vk::ImageUsageFlagBits::eColorAttachment, 
-    vk::ImageAspectFlagBits::eColor, 
-    vk::MemoryPropertyFlagBits::eDeviceLocal, 
-    1, p_gfx), m_push_consts(), enabled(true) {
-    m_push_consts.near_plane = 0.3f;
-    m_push_consts.focal_plane = 2.0f;
-    m_push_consts.far_plane = 3.8f;
+    m_buffer_bg(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+	            vk::Format::eR32G32B32A32Sfloat, 
+                vk::ImageUsageFlagBits::eTransferDst |
+                vk::ImageUsageFlagBits::eSampled |
+                vk::ImageUsageFlagBits::eStorage |
+                vk::ImageUsageFlagBits::eTransferSrc |
+                vk::ImageUsageFlagBits::eColorAttachment, 
+                vk::ImageAspectFlagBits::eColor, 
+                vk::MemoryPropertyFlagBits::eDeviceLocal, 
+                1, p_gfx), 
+    m_buffer_fg(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+                vk::Format::eR32G32B32A32Sfloat,
+                vk::ImageUsageFlagBits::eTransferDst |
+                vk::ImageUsageFlagBits::eSampled |
+                vk::ImageUsageFlagBits::eStorage |
+                vk::ImageUsageFlagBits::eTransferSrc |
+                vk::ImageUsageFlagBits::eColorAttachment,
+                vk::ImageAspectFlagBits::eColor,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                1, p_gfx),
+    m_push_consts(), enabled(true) {
     m_push_consts.max_depth = 0.8f;
-    m_push_consts.window_size = p_gfx->GetWindowSize();
+    m_push_consts.lens_diameter = 0.035f;
+    m_push_consts.focal_length = 0.05f;
+    m_push_consts.focal_distance = 1.0f;
+    m_push_consts.coc_sample_scale = 800.0f;
+    m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.alignmentTest = 1234;
     SetupBuffer();
     SetupDescriptor();
@@ -98,15 +145,18 @@ DOFPass::~DOFPass() {
     p_gfx->GetDeviceRef().destroyPipeline(m_pipeline);
 
     m_descriptor.destroy(p_gfx->GetDeviceRef());
-    m_buffer.destroy(p_gfx->GetDeviceRef());
+    m_buffer_bg.destroy(p_gfx->GetDeviceRef());
+    m_buffer_fg.destroy(p_gfx->GetDeviceRef());
 }
 
 void DOFPass::Setup() {
-    WriteToDescriptor(0,
+    WriteToDescriptor(0, m_buffer_bg.Descriptor());
+    WriteToDescriptor(1, m_buffer_fg.Descriptor());
+    WriteToDescriptor(2,
         static_cast<LightingPass*>(p_prev_pass)->GetBufferRef().Descriptor());
-    WriteToDescriptor(1, m_buffer.Descriptor());
-    WriteToDescriptor(2, p_gfx->GetDepthBuffer().Descriptor());
-    WriteToDescriptor(3, tile_max_buffer_desc);
+    WriteToDescriptor(3, 
+        static_cast<LightingPass*>(p_prev_pass)->GetVeloDepthBufferRef().Descriptor());
+    WriteToDescriptor(4, neighbour_max_buffer_desc);
     SetupPipeline();
 }
 
@@ -155,14 +205,19 @@ void DOFPass::Render() {
     p_gfx->GetCommandBuffer().dispatch((p_gfx->GetWindowSize().x + group_size - 1) / group_size,
         p_gfx->GetWindowSize().y, 1);
 
-    img_mem_barrier.setImage(m_buffer.GetImage());
+    img_mem_barrier.setImage(m_buffer_bg.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(
         vk::PipelineStageFlagBits::eComputeShader,
         vk::PipelineStageFlagBits::eFragmentShader,
         vk::DependencyFlagBits::eDeviceGroup,
         0, nullptr, 0, nullptr, 1, &img_mem_barrier);
 
-    p_gfx->CommandCopyImage(m_buffer, p_prev_lighting_pass->GetBufferRef());
+    img_mem_barrier.setImage(m_buffer_fg.GetImage());
+    p_gfx->GetCommandBuffer().pipelineBarrier(
+        vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::DependencyFlagBits::eDeviceGroup,
+        0, nullptr, 0, nullptr, 1, &img_mem_barrier);
 }
 
 void DOFPass::Teardown()

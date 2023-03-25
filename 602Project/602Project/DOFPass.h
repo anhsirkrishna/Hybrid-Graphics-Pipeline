@@ -5,7 +5,8 @@ class Graphics;
 
 class DOFPass : public RenderPass {
 private:
-	ImageWrap m_buffer;
+	ImageWrap m_buffer_bg;
+	ImageWrap m_buffer_fg;
 	void SetupBuffer();
 
 	PushConstantDoF m_push_consts;
@@ -17,7 +18,7 @@ private:
 	vk::Pipeline m_pipeline;
 	void SetupPipeline();
 
-	vk::DescriptorImageInfo tile_max_buffer_desc;
+	vk::DescriptorImageInfo neighbour_max_buffer_desc;
 
 	bool enabled;
 public:
@@ -28,7 +29,13 @@ public:
 	void Teardown() override;
 
 	void WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info);
-	void SetTileMaxBufferDesc(const ImageWrap& buffer);
+	void SetNeighbourMaxBufferDesc(const ImageWrap& buffer);
+
+	const PushConstantDoF& GetDOFParams();
+
+	const ImageWrap& GetBGBuffer() const;
+	const ImageWrap& GetFGBuffer() const;
+
 
 	void DrawGUI();
 };

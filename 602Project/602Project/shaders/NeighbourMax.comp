@@ -20,7 +20,7 @@ void main()
     }
     ivec2 load_pos = gpos;
     float min_depth = 1000.0f;
-    float max_coc = 0.0f;
+    float max_coc = 0.001f;
     vec2 max_velo = vec2(0.0f);
     for (int i=-1; i <= 1; ++i) {
         for (int j=-1; j <= 1; ++j) {

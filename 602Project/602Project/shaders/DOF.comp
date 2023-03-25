@@ -7,62 +7,143 @@
 
 const int GROUP_SIZE = 128;
 layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
-layout(set = 0, binding = 0) uniform sampler2D inImage;
-layout(set = 0, binding = 1, rgba32f) uniform image2D outImage;
-layout(set = 0, binding = 2) uniform sampler2D depthImage;
-layout(set = 0, binding = 3, rgba32f) uniform image2D tile_max_buffer;
+
+layout(set = 0, binding = 0, rgba32f) uniform image2D out_image_bg;
+layout(set = 0, binding = 0, rgba32f) uniform image2D out_image_fg;
+layout(set = 0, binding = 1, rgba32f) uniform image2D color_buffer;
+layout(set = 0, binding = 2, rgba32f) uniform image2D vel_depth_buffer;
+layout(set = 0, binding = 3, rgba32f) uniform image2D neighbour_max_buffer;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
-int num_taps = 10;
-float POISSON[10] = float[10](2/10.0f, -3/10.0f, -8/10.0f, 5/10.0f, 3/10.0f, -5/10.0f, 2/10.0f, -4/10.0f, -3/10.0f, 4/10.0f);
+float PI = 3.14159;
 
-float coc_max = 35.0f;
-float coc_min = 5.0f;
+//The following function is from Shirley 1997
+vec2 ToUnitDisk(vec2 onSquare) {
+    float phi, r, u, v;
+    float a = 2 * onSquare.x - 1;
+    float b = 2 * onSquare.y - 1;
 
-float ComputeDepthBlur(float depth) {
-    float depth_blur;
-    if (depth < pc.focal_plane) {
-        depth_blur = (depth - pc.focal_plane) / (pc.focal_plane - pc.near_plane);
+    if (a > -b) 
+    {
+        if (a > b)
+        {
+            r = a;
+            phi = (PI/4) * (b/a);
+        }
+        else
+        {
+            r = b;
+            phi = (PI/4) * (2 - (a/b));
+        }
     }
-    else {
-        depth_blur = (depth - pc.focal_plane) / (pc.far_plane - pc.focal_plane);
-        depth_blur = min(depth_blur, 1);
+    else
+    {
+        if (a < b)
+        {
+            r = -a;
+            phi = (PI/4) * (4 + (b/a));
+        }
+        else
+        {
+            r = -b;
+            if (b != 0)
+                phi = (PI/4) * (6 - (a/b));
+            else
+                phi = 0;
+        }
     }
+    u = r * cos(phi);
+    v = r * sin(phi);
+    return vec2(u,v);
+}
 
-    //Scale and bias into range of 0 - 1
-    return (depth_blur * 0.5) + 0.5 ;
+//The following equation is from Potmesil 1981
+float CaclulateCoCDiameter(float depth) {
+    float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) * 
+                ( abs(depth - pc.focal_distance) / depth );
+    return Cr * pc.coc_sample_scale;
+}
+
+//The following functions are from McGuire 2012
+float softDepthCompare(float depth1, float depth2) {
+    return clamp(1 - (depth1 - depth2) / pc.soft_z_extent, 0, 1);
+}
+
+float cone(vec2 X, vec2 Y, float depth) {
+    float coc_radius = CaclulateCoCDiameter(depth) / 2;
+    return clamp(1 - length(X-Y)/coc_radius, 0, 1);
+}
+
+float cylinder(vec2 X, vec2 Y, float depth) {
+    float coc_radius = CaclulateCoCDiameter(depth) / 2;
+    return 1.0 - smoothstep(0.95f*coc_radius, 1.05f*coc_radius, length(X-Y));
 }
 
 void main()
 {
     ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = gpos / vec2(pc.window_size);
-    vec2 pixel_size = 1 / vec2(pc.window_size);
+
     if (pc.alignmentTest != 1234){
-        imageStore(outImage, gpos, vec4(vec3(0, 1, 1), 1));
+        imageStore(out_image, gpos, vec4(vec3(0, 1, 1), 1));
         return;
     }
-    vec4 out_color = vec4(0);
-    vec4 depth = texture(depthImage, uv);
 
-    float blur = ComputeDepthBlur(depth.r);
-    float blur_radius = abs((blur * coc_max) - coc_min);
+    vec2 pixel_size = 1.0f / vec2(imageSize(color_buffer));
+    vec2 half_px = 0.5*pixel_size;
 
-    //blur_radius = texture(tile_max_buffer, uv).w;
+    //Max Neighbourhood COC is stored in the w component of the NeighbourMax buffer
+    float neighbour_coc = imageLoad(neighbour_max_buffer, ivec2(gpos/pc.tile_size)).w;
+    
+    //Current pixel color
+    vec4 out_color = imageLoad(color_buffer, gpos);
 
-    vec2 read_coords;
-    float tap_depth;
-    float tap_blur;
-    vec4 tap_color;
-    for (int t = 0; t < num_taps; t++) {
-        read_coords = uv + (pixel_size * POISSON[t] * blur_radius);
-        tap_depth = texture(depthImage, read_coords).r;
-        tap_blur = ComputeDepthBlur(tap_depth);
-        tap_color = texture(inImage, read_coords);
-        out_color.rgb += tap_color.rgb * tap_blur;
-        out_color.a += tap_blur;
+    //Current velocity_depth
+    vec4 curr_vel_depth = imageLoad(vel_depth_buffer, gpos);
+
+    //Sample the current pixel
+    float weight = 1 / curr_vel_depth.w;
+    out_color *= weight;
+
+    int max_rings = 3;
+    float coc_radius = neighbour_coc / 2;
+    for (int i=1; i <=max_rings ; ++i ) {
+        int taps = i*8;
+        for (int j = 0; j <= taps ; j+=4) {
+            for (int k = 0; k <= taps; k+=4) {
+                if (j == k)
+                    continue;
+
+                float x = float(j) / taps;
+                float y = float(k) / taps;
+                vec2 circle_tap = ToUnitDisk(vec2(x, y));
+                vec2 tap_pos = (float(i)/max_rings) * coc_radius * circle_tap;
+
+                ivec2 load_pos = ivec2(vec2(gpos) + tap_pos + half_px);
+
+                //Sample the depth. 
+                //Depth stored in the w component.
+                vec4 sample_vel_depth = imageLoad(vel_depth_buffer, load_pos);
+
+                //Foreground vs background classification
+//                float fg = softDepthCompare(curr_vel_depth.w, sample_vel_depth.w);
+//                float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
+//
+//                float alpha = (fg * cone(load_pos, gpos, sample_vel_depth.w)) +
+//                              (bg * cone(gpos, load_pos, curr_vel_depth.w)) +
+//                              (cylinder(load_pos, gpos, sample_vel_depth.w) * cylinder(gpos, load_pos, curr_vel_depth.w) * 2);
+                
+                float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
+
+                float alpha = 
+                              (bg * cone(gpos, load_pos, curr_vel_depth.w)) +
+                              (cylinder(load_pos, gpos, sample_vel_depth.w) * cylinder(gpos, load_pos, curr_vel_depth.w) * 2);
+
+                weight += alpha;
+                out_color += alpha * imageLoad(color_buffer, load_pos);
+            }
+        }
     }
 
-    imageStore(outImage, gpos, out_color / out_color.a);
+    imageStore(out_image, gpos, out_color / weight);
 }

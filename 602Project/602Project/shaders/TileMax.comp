@@ -11,16 +11,10 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0, rgba32f) uniform image2D vel_depth_buffer;
 layout(set = 0, binding = 1, rgba32f) uniform image2D tile_max_buffer;
 
-float Vd = (pc.focal_length * pc.focal_distance) / (pc.focal_distance - pc.focal_length);
-
 float CaclulateCoCDiameter(float depth) {
-    //Following caculation taken from [Potmesil 1982]
-    if (depth <= pc.focal_length)
-        return 1;
-
-    float Vp = (pc.focal_length * depth) / (depth - pc.focal_length);
-
-    return abs(Vd - Vp) * (pc.lens_diameter / Vd); 
+    float Cr =  ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) * 
+                ( abs(depth - pc.focal_distance) / depth );
+    return Cr * pc.coc_sample_scale;
 }
 
 void main()
@@ -32,7 +26,7 @@ void main()
     }
     ivec2 load_pos = gpos * pc.tile_size;
     float min_depth = 1000.0f;
-    float max_coc = 0.0f;
+    float max_coc = 0.001f;
     vec2 max_velo = vec2(0.0f);
     ivec2 it_load_pos;
     vec4 vel_depth;
@@ -40,6 +34,7 @@ void main()
     for (int i=-2; i <= iter_max; ++i) {
         for (int j=-2; j <= iter_max; ++j) {
             it_load_pos = load_pos + ivec2(i, j);
+            it_load_pos = max(ivec2(0), it_load_pos);
             vel_depth = imageLoad(vel_depth_buffer, it_load_pos);
             min_depth = min(min_depth, vel_depth.w);
             max_coc = max(max_coc, CaclulateCoCDiameter(vel_depth.w));

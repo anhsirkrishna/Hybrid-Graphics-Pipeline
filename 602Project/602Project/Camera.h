@@ -18,6 +18,10 @@ public:
     void SetControlWindow(Window* _p_window);
 
     void DrawGUI();
+
+    void SetEyePos(glm::vec3 _eye_pos);
+    void SetSpin(float _spin);
+    void SetTilt(float _tilt);
 private:
     float ry;
     float front;

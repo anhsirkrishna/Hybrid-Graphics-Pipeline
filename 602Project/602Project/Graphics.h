@@ -191,6 +191,8 @@ public:
 	const vk::Device& GetDeviceRef() const { return m_device; }
 	const vk::PhysicalDevice& GetPhysicalDeviceRef() const { return m_physical_device; }
 
+	Camera* GetCamera();
+
 	void EnablePostProcess();
 	void DisablePostProcess();
 

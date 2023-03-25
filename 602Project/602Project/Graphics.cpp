@@ -797,7 +797,10 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
 
     //Add the depth of field pass to the list of passes.
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_lighting_pass.get());
-    p_dof_pass->SetTileMaxBufferDesc(p_tile_max_pass->GetBuffer());
+    p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
+
+    //Make sure TileMaxPass can access DOFPass for the DOF parameters
+    p_tile_max_pass->SetDOFPass(p_dof_pass.get());
 
     //Add the MBlur pass to the list of passes.
     std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
@@ -877,6 +880,10 @@ void Graphics::DrawFrame() {
     }   // Done recording;  Execute!
 
     SubmitFrame();
+}
+
+Camera* Graphics::GetCamera() {
+    return p_active_cam;
 }
 
 void Graphics::EnablePostProcess() {

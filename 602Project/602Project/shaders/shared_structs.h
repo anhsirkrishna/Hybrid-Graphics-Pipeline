@@ -126,18 +126,19 @@ struct PushConstantMBlur
 	int tile_size;
 	int max_samples;
 	float soft_z_extent;
-	int curr_s;
 	int alignmentTest;
 };
 
 // Push constant structure for the DoF Pass
 struct PushConstantDoF
 {
-  float near_plane;
-  float focal_plane;
-  float far_plane;
+  float focal_length;
+  float focal_distance;
+  float lens_diameter;
   float max_depth;
-  vec2 window_size;
+  float soft_z_extent;
+  float coc_sample_scale;
+  int tile_size;
   int alignmentTest;
 };
 
@@ -148,6 +149,7 @@ struct PushConstantTileMax
 	float lens_diameter;
 	float focal_length;
 	float focal_distance;
+	float coc_sample_scale;
 	int alignmentTest;
 };
 

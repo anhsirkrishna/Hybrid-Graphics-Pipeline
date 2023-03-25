@@ -1,5 +1,8 @@
 #pragma once
 #include "RenderPass.h"
+
+class DOFPass;
+
 class TileMaxPass : public RenderPass{
 private:
 	ImageWrap m_buffer;
@@ -13,6 +16,8 @@ private:
 	void SetupPipeline();
 
 	PushConstantTileMax m_push_consts;
+
+	DOFPass* p_dof_pass;
 public:
 	TileMaxPass(Graphics* _p_gfx, RenderPass* p_prev_pass = nullptr);
 	~TileMaxPass();
@@ -26,5 +31,7 @@ public:
 	const ImageWrap& GetBuffer() const;
 
 	static const int tile_size = 20;
+
+	void SetDOFPass(DOFPass* _p_dof_pass);
 };
 

@@ -188,6 +188,9 @@
     <CustomBuild Include="shaders\MBlur.comp">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="shaders\DOF_primitive.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

@@ -115,4 +115,18 @@ void Camera::SetControlWindow(Window* _p_window) {
 void Camera::DrawGUI() {
     ImGui::Text("Camera eye x: %f  y: %f  z: %f", 
         eye.x, eye.y, eye.z);
+    ImGui::Text("Camera Spin: %f  Tilt: %f",
+        spin, tilt);
+}
+
+void Camera::SetEyePos(glm::vec3 _eye_pos) {
+    eye = _eye_pos;
+}
+
+void Camera::SetSpin(float _spin) {
+    spin = _spin;
+}
+
+void Camera::SetTilt(float _tilt) {
+    tilt = _tilt;
 }

@@ -70,7 +70,6 @@ MBlurPass::MBlurPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
     m_push_consts.velocity_threshold = 0.0f;
     m_push_consts.max_samples = 20;
     m_push_consts.soft_z_extent = 0.01;
-    m_push_consts.curr_s = 0;
     m_push_consts.alignmentTest = 1234;
 
     SetupBuffer();
@@ -164,9 +163,6 @@ void MBlurPass::DrawGUI() {
 
     ImGui::SliderInt("Velocity max sample count: ", &m_push_consts.max_samples,
         1, 50);
-
-    ImGui::SliderInt("Curr S : ", &m_push_consts.curr_s,
-        0, 50);
 
     ImGui::SliderFloat("Soft Z extent: ", &m_push_consts.soft_z_extent,
         0.01f, 0.1f);
