@@ -280,6 +280,10 @@ void BufferDebugDraw::SetDOFBuffer(const ImageWrap& draw_buffer) {
     dof_buffer_desc = draw_buffer.Descriptor();
 }
 
+void BufferDebugDraw::SetMedianBuffer(const ImageWrap& draw_buffer) {
+    median_buffer_desc = draw_buffer.Descriptor();
+}
+
 void BufferDebugDraw::DrawGUI() {
     if (ImGui::BeginMenu("Draw FBOs")) {
         if (ImGui::MenuItem("Disable", "", draw_buffer == DrawBuffer::DISABLE)) {
@@ -368,6 +372,12 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::DOF_ALPHA;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(dof_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw Median Buffer", "", draw_buffer == DrawBuffer::MEDIAN)) {
+            draw_buffer = DrawBuffer::MEDIAN;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(median_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         ImGui::EndMenu();

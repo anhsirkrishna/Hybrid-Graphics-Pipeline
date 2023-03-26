@@ -12,6 +12,7 @@
 #include "NeighbourMax.h"
 #include "MBlurPass.h"
 #include "PreDOFPass.h"
+#include "MedianPass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -807,6 +808,10 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_pre_dof_pass.get());
     p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
 
+    //Add the median pass to the list of passes.
+    std::unique_ptr<MedianPass> p_median_pass = 
+        std::make_unique<MedianPass>(this, p_dof_pass.get());
+
     //Make sure TileMaxPass can access DOFPass for the DOF parameters
     p_tile_max_pass->SetDOFPass(p_dof_pass.get());
 
@@ -828,12 +833,14 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetDOFBGBuffer(p_dof_pass->GetBGBuffer());
     p_debug_buffer_pass->SetDOFFGBuffer(p_dof_pass->GetFGBuffer());
     p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
+    p_debug_buffer_pass->SetMedianBuffer(p_median_pass->GetBuffer());
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));
     render_passes.push_back(std::move(p_neighbour_max_pass));
     render_passes.push_back(std::move(p_pre_dof_pass));
     render_passes.push_back(std::move(p_dof_pass));
+    render_passes.push_back(std::move(p_median_pass));
     render_passes.push_back(std::move(p_mblur_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));
 

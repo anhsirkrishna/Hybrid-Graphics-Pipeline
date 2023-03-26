@@ -20,7 +20,8 @@ public:
 		DOF_BG,
 		DOF_FG,
 		DOF,
-		DOF_ALPHA
+		DOF_ALPHA,
+		MEDIAN
 	};
 
 private:
@@ -32,6 +33,7 @@ private:
 	vk::DescriptorImageInfo dof_bg_buffer_desc;
 	vk::DescriptorImageInfo dof_fg_buffer_desc;
 	vk::DescriptorImageInfo dof_buffer_desc;
+	vk::DescriptorImageInfo median_buffer_desc;
 	void SetDrawBuffer(vk::DescriptorImageInfo& draw_descriptor);
 
 	DescriptorWrap m_descriptor;
@@ -65,6 +67,7 @@ public:
 	void SetDOFBGBuffer(const ImageWrap& draw_buffer);
 	void SetDOFFGBuffer(const ImageWrap& draw_buffer);
 	void SetDOFBuffer(const ImageWrap& draw_buffer);
+	void SetMedianBuffer(const ImageWrap& draw_buffer);
 
 	void DrawGUI();
 };

@@ -95,14 +95,20 @@ void main() {
     }
     else if (pcDebugBuffer.draw_buffer == 13)
     {
-        //Draw the DoF FG buffer
+        //Draw the DoF buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color/out_color.a;
     }
     else if (pcDebugBuffer.draw_buffer == 14)
     {
-        //Draw the DoF FG buffer
+        //Draw the DoF alpha buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = vec4(vec3(out_color.a), 1.0f);
+    }
+    else if (pcDebugBuffer.draw_buffer == 15)
+    {
+        //Draw the Median buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color;
     }
 }
