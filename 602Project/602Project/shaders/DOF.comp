@@ -5,14 +5,17 @@
 
 #include "shared_structs.h"
 
+#define DOF_SINGLE_PIXEL_RADIUS 0.7071
+
 const int GROUP_SIZE = 128;
 layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, rgba32f) uniform image2D out_image_bg;
 layout(set = 0, binding = 1, rgba32f) uniform image2D out_image_fg;
-layout(set = 0, binding = 2, rgba32f) uniform image2D color_buffer;
-layout(set = 0, binding = 3, rgba32f) uniform image2D vel_depth_buffer;
+layout(set = 0, binding = 2, rgba32f) uniform image2D color_depth_buffer;
+layout(set = 0, binding = 3, rgba32f) uniform image2D pre_params_buffer;
 layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
+layout(set = 0, binding = 5, rgba32f) uniform image2D out_image;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
@@ -65,50 +68,32 @@ float CaclulateCoCDiameter(float depth) {
     return Cr * pc.coc_sample_scale;
 }
 
-//The following functions are from McGuire 2012
-float softDepthCompare(float depth1, float depth2) {
-    return clamp(1 - (depth1 - depth2) / pc.depth_scale_fg, 0, 1);
+float SpreadCompare(float offset_coc, float sample_coc) {
+    return clamp(sample_coc - max(offset_coc - 1.0f, 0.0f), 0.0f, 1.0f);
 }
 
-float cone(vec2 X, vec2 Y, float depth) {
-    float coc_radius = CaclulateCoCDiameter(depth) / 2;
-    return clamp(1 - length(X-Y)/coc_radius, 0, 1);
-}
-
-float cylinder(vec2 X, vec2 Y, float depth) {
-    float coc_radius = CaclulateCoCDiameter(depth) / 2;
-    return 1.0 - smoothstep(0.95f*coc_radius, 1.05f*coc_radius, length(X-Y));
+float SampleAlpha(float sample_coc) {
+    return min( 1.0f / (PI * sample_coc * sample_coc),
+                1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
 }
 
 void main()
 {
     ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
 
-    vec2 pixel_size = 1.0f / vec2(imageSize(color_buffer));
+    vec2 pixel_size = 1.0f / vec2(imageSize(color_depth_buffer));
     vec2 half_px = 0.5*pixel_size;
 
-    //Max Neighbourhood COC is stored in the w component of the NeighbourMax buffer
-    float neighbour_coc = imageLoad(neighbour_max_buffer, ivec2(gpos/pc.tile_size)).w;
-    
-    //Current pixel color
-    vec4 out_color = imageLoad(color_buffer, gpos);
-
-    //Current velocity_depth
-    vec4 curr_vel_depth = imageLoad(vel_depth_buffer, gpos);
-
-    //Sample the current pixel
-    float weight = 1 / curr_vel_depth.w;
-    out_color *= weight;
-
     int max_rings = 3;
-    float coc_radius = CaclulateCoCDiameter(curr_vel_depth.w) / 2;
+    float coc_radius = imageLoad(neighbour_max_buffer, ivec2((gpos * 2)/pc.tile_size)).w / 2;
+
+    vec4 out_color_bg = vec4(0.0f);
+    vec4 out_color_fg = vec4(0.0f);
+    int sample_count = 0;
     for (int i=1; i <=max_rings ; ++i ) {
         int taps = i*8;
         for (int j = 0; j <= taps ; j+=4) {
             for (int k = 0; k <= taps; k+=4) {
-                if (j == k)
-                    continue;
-
                 float x = float(j) / taps;
                 float y = float(k) / taps;
                 vec2 circle_tap = ToUnitDisk(vec2(x, y));
@@ -116,24 +101,31 @@ void main()
 
                 ivec2 load_pos = ivec2(vec2(gpos) + tap_pos + half_px);
 
-                //Sample the depth. 
+                //Sample the params. 
                 //Depth stored in the w component.
-                vec4 sample_vel_depth = imageLoad(vel_depth_buffer, load_pos);
+                vec4 sample_params = imageLoad(pre_params_buffer, load_pos);
+
+                float spread_cmp = SpreadCompare(coc_radius, sample_params.r);
 
                 //Foreground vs background classification
-                float fg = softDepthCompare(curr_vel_depth.w, sample_vel_depth.w);
-                float bg = softDepthCompare(sample_vel_depth.w, curr_vel_depth.w);
-
-                float alpha = (fg * cone(load_pos, gpos, curr_vel_depth.w)) +
-                              (bg * cone(gpos, load_pos, sample_vel_depth.w)) +
-                              (cylinder(load_pos, gpos, sample_vel_depth.w) * cylinder(gpos, load_pos, curr_vel_depth.w) * 2);
-
-                weight += alpha;
-                out_color += alpha * imageLoad(color_buffer, load_pos);
+                float bg = sample_params.g * spread_cmp;
+                float fg = sample_params.b * spread_cmp;
+                bg = sample_params.g;
+                fg = sample_params.b;
+                
+                vec3 sample_color = imageLoad(color_depth_buffer, load_pos).rgb;
+                out_color_bg += max(bg, 0.0f) * vec4(sample_color, 1.0);
+                out_color_fg += max(fg, 0.0f) * vec4(sample_color, 1.0);
+                sample_count++;
             }
         }
     }
+    float alpha = 
+        clamp((2.0 * (1.0 / sample_count) * (1.0 / SampleAlpha(coc_radius)) * (out_color_fg.a)), 
+               0.0f, 1.0f);
+    vec3 out_color = mix(out_color_bg.rgb/out_color_bg.a, out_color_fg.rgb/out_color_fg.a, alpha);
 
-    imageStore(out_image_bg, gpos, out_color / weight);
-    imageStore(out_image_fg, gpos, vec4(0.0f, 0.0f, 1.0f, 0.0f));
+    imageStore(out_image_bg, gpos, out_color_bg);
+    imageStore(out_image_fg, gpos, out_color_fg);
+    imageStore(out_image, gpos, vec4(out_color, alpha));
 }

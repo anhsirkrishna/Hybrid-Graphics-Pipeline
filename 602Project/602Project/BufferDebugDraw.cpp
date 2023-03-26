@@ -268,6 +268,18 @@ void BufferDebugDraw::SetPreDOFParamsBuffer(const ImageWrap& draw_buffer) {
     pre_dof_params_buffer_desc = draw_buffer.Descriptor();
 }
 
+void BufferDebugDraw::SetDOFBGBuffer(const ImageWrap& draw_buffer) {
+    dof_bg_buffer_desc = draw_buffer.Descriptor();
+}
+
+void BufferDebugDraw::SetDOFFGBuffer(const ImageWrap& draw_buffer) {
+    dof_fg_buffer_desc = draw_buffer.Descriptor();
+}
+
+void BufferDebugDraw::SetDOFBuffer(const ImageWrap& draw_buffer) {
+    dof_buffer_desc = draw_buffer.Descriptor();
+}
+
 void BufferDebugDraw::DrawGUI() {
     if (ImGui::BeginMenu("Draw FBOs")) {
         if (ImGui::MenuItem("Disable", "", draw_buffer == DrawBuffer::DISABLE)) {
@@ -332,6 +344,30 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::PRE_DOF_FG;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(pre_dof_params_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw DOF BG Buffer", "", draw_buffer == DrawBuffer::DOF_BG)) {
+            draw_buffer = DrawBuffer::DOF_BG;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(dof_bg_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw DOF FG Buffer", "", draw_buffer == DrawBuffer::DOF_FG)) {
+            draw_buffer = DrawBuffer::DOF_FG;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(dof_fg_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw DOF Buffer", "", draw_buffer == DrawBuffer::DOF)) {
+            draw_buffer = DrawBuffer::DOF;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(dof_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw DOF Alpha Buffer", "", draw_buffer == DrawBuffer::DOF_ALPHA)) {
+            draw_buffer = DrawBuffer::DOF_ALPHA;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(dof_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         ImGui::EndMenu();

@@ -79,4 +79,30 @@ void main() {
         //Draw the downscaled filtered pre dof FG buffer
         fragColor = vec4(0.0f, 0.0f, texture(renderedImage, uv).b, 1.0f);
     }
+    else if (pcDebugBuffer.draw_buffer == 11)
+    {
+        //Draw the DoF BG buffer
+        vec4 out_color = texture(renderedImage, uv);
+        out_color = out_color/out_color.a;
+        fragColor = out_color;
+    }
+    else if (pcDebugBuffer.draw_buffer == 12)
+    {
+        //Draw the DoF FG buffer
+        vec4 out_color = texture(renderedImage, uv);
+        out_color = out_color/out_color.a;
+        fragColor = out_color;
+    }
+    else if (pcDebugBuffer.draw_buffer == 13)
+    {
+        //Draw the DoF FG buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color/out_color.a;
+    }
+    else if (pcDebugBuffer.draw_buffer == 14)
+    {
+        //Draw the DoF FG buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = vec4(vec3(out_color.a), 1.0f);
+    }
 }

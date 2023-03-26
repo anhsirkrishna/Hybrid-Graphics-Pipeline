@@ -16,7 +16,11 @@ public:
 		PRE_DOF,
 		PRE_DOF_COC,
 		PRE_DOF_BG,
-		PRE_DOF_FG
+		PRE_DOF_FG,
+		DOF_BG,
+		DOF_FG,
+		DOF,
+		DOF_ALPHA
 	};
 
 private:
@@ -25,6 +29,9 @@ private:
 	vk::DescriptorImageInfo neighbour_max_buffer_desc;
 	vk::DescriptorImageInfo pre_dof_buffer_desc;
 	vk::DescriptorImageInfo pre_dof_params_buffer_desc;
+	vk::DescriptorImageInfo dof_bg_buffer_desc;
+	vk::DescriptorImageInfo dof_fg_buffer_desc;
+	vk::DescriptorImageInfo dof_buffer_desc;
 	void SetDrawBuffer(vk::DescriptorImageInfo& draw_descriptor);
 
 	DescriptorWrap m_descriptor;
@@ -55,6 +62,9 @@ public:
 	void SetNeighbourMaxBuffer(const ImageWrap& draw_buffer);
 	void SetPreDOFBuffer(const ImageWrap& draw_buffer);
 	void SetPreDOFParamsBuffer(const ImageWrap& draw_buffer);
+	void SetDOFBGBuffer(const ImageWrap& draw_buffer);
+	void SetDOFFGBuffer(const ImageWrap& draw_buffer);
+	void SetDOFBuffer(const ImageWrap& draw_buffer);
 
 	void DrawGUI();
 };

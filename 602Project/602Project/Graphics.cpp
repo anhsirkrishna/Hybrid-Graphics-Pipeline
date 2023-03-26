@@ -804,7 +804,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_pre_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
 
     //Add the depth of field pass to the list of passes.
-    std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_lighting_pass.get());
+    std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_pre_dof_pass.get());
     p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
 
     //Make sure TileMaxPass can access DOFPass for the DOF parameters
@@ -825,6 +825,9 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetNeighbourMaxBuffer(p_neighbour_max_pass->GetBuffer());
     p_debug_buffer_pass->SetPreDOFBuffer(p_pre_dof_pass->GetBuffer());
     p_debug_buffer_pass->SetPreDOFParamsBuffer(p_pre_dof_pass->GetParamsBuffer());
+    p_debug_buffer_pass->SetDOFBGBuffer(p_dof_pass->GetBGBuffer());
+    p_debug_buffer_pass->SetDOFFGBuffer(p_dof_pass->GetFGBuffer());
+    p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));

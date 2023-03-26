@@ -4,7 +4,7 @@
 #include "Camera.h"
 
 #include "DOFPass.h"
-#include "LightingPass.h"
+#include "PreDOFPass.h"
 #include "TileMaxPass.h"
 
 void DOFPass::SetupBuffer() {
@@ -13,6 +13,9 @@ void DOFPass::SetupBuffer() {
 
     m_buffer_fg.CreateTextureSampler();
     m_buffer_fg.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_buffer.CreateTextureSampler();
+    m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void DOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info) {
@@ -33,6 +36,10 @@ const ImageWrap& DOFPass::GetBGBuffer() const {
 
 const ImageWrap& DOFPass::GetFGBuffer() const {
     return m_buffer_fg;
+}
+
+const ImageWrap& DOFPass::GetBuffer() const {
+    return m_buffer;
 }
 
 void DOFPass::DrawGUI() {
@@ -74,7 +81,9 @@ void DOFPass::SetupDescriptor() {
         {3, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {4, vk::DescriptorType::eStorageImage, 1,
-         vk::ShaderStageFlagBits::eCompute}, });
+         vk::ShaderStageFlagBits::eCompute},
+        {5, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute} });
 }
 
 void DOFPass::SetupPipeline() {
@@ -110,7 +119,7 @@ void DOFPass::SetupPipeline() {
 }
 
 DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx, _p_prev_pass),
-    m_buffer_bg(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+    m_buffer_bg(p_gfx->GetWindowSize().x/2, p_gfx->GetWindowSize().y/2,
 	            vk::Format::eR32G32B32A32Sfloat, 
                 vk::ImageUsageFlagBits::eTransferDst |
                 vk::ImageUsageFlagBits::eSampled |
@@ -120,7 +129,7 @@ DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx
                 vk::ImageAspectFlagBits::eColor, 
                 vk::MemoryPropertyFlagBits::eDeviceLocal, 
                 1, p_gfx), 
-    m_buffer_fg(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+    m_buffer_fg(p_gfx->GetWindowSize().x/2, p_gfx->GetWindowSize().y/2,
                 vk::Format::eR32G32B32A32Sfloat,
                 vk::ImageUsageFlagBits::eTransferDst |
                 vk::ImageUsageFlagBits::eSampled |
@@ -130,12 +139,22 @@ DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx
                 vk::ImageAspectFlagBits::eColor,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 1, p_gfx),
+    m_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
     m_push_consts(), enabled(true) {
     m_push_consts.lens_diameter = 0.035f;
     m_push_consts.focal_length = 0.05f;
     m_push_consts.focal_distance = 1.0f;
     m_push_consts.coc_sample_scale = 800.0f;
-    m_push_consts.depth_scale_fg = 1.0f;
+    m_push_consts.depth_scale_fg = 0.15f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.alignmentTest = 1234;
     SetupBuffer();
@@ -149,16 +168,18 @@ DOFPass::~DOFPass() {
     m_descriptor.destroy(p_gfx->GetDeviceRef());
     m_buffer_bg.destroy(p_gfx->GetDeviceRef());
     m_buffer_fg.destroy(p_gfx->GetDeviceRef());
+    m_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void DOFPass::Setup() {
     WriteToDescriptor(0, m_buffer_bg.Descriptor());
     WriteToDescriptor(1, m_buffer_fg.Descriptor());
     WriteToDescriptor(2,
-        static_cast<LightingPass*>(p_prev_pass)->GetBufferRef().Descriptor());
+        static_cast<PreDOFPass*>(p_prev_pass)->GetBuffer().Descriptor());
     WriteToDescriptor(3, 
-        static_cast<LightingPass*>(p_prev_pass)->GetVeloDepthBufferRef().Descriptor());
+        static_cast<PreDOFPass*>(p_prev_pass)->GetParamsBuffer().Descriptor());
     WriteToDescriptor(4, neighbour_max_buffer_desc);
+    WriteToDescriptor(5, m_buffer.Descriptor());
     SetupPipeline();
 }
 
@@ -166,7 +187,7 @@ void DOFPass::Render() {
     if (not enabled)
         return;
 
-    LightingPass* p_prev_lighting_pass = static_cast<LightingPass*>(p_prev_pass);
+    PreDOFPass* p_pre_dof_pass = static_cast<PreDOFPass*>(p_prev_pass);
     vk::ImageSubresourceRange range;
     range.setAspectMask(vk::ImageAspectFlagBits::eColor);
     range.setBaseMipLevel(0);
@@ -177,7 +198,7 @@ void DOFPass::Render() {
     vk::ImageMemoryBarrier img_mem_barrier;
     img_mem_barrier.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
     img_mem_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-    img_mem_barrier.setImage(p_prev_lighting_pass->GetBufferRef().GetImage());
+    img_mem_barrier.setImage(p_pre_dof_pass->GetBuffer().GetImage());
     img_mem_barrier.setOldLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setNewLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setSubresourceRange(range);
@@ -204,8 +225,9 @@ void DOFPass::Render() {
     // This MUST match the shaders's line:
     //    layout(local_size_x=GROUP_SIZE, local_size_y=1, local_size_z=1) in;
     glm::uint group_size = 128;
-    p_gfx->GetCommandBuffer().dispatch((p_gfx->GetWindowSize().x + group_size - 1) / group_size,
-        p_gfx->GetWindowSize().y, 1);
+    p_gfx->GetCommandBuffer().dispatch(
+        ((p_gfx->GetWindowSize().x / 2) + group_size - 1) / group_size,
+        (p_gfx->GetWindowSize().y / 2), 1);
 
     img_mem_barrier.setImage(m_buffer_bg.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(
@@ -215,6 +237,13 @@ void DOFPass::Render() {
         0, nullptr, 0, nullptr, 1, &img_mem_barrier);
 
     img_mem_barrier.setImage(m_buffer_fg.GetImage());
+    p_gfx->GetCommandBuffer().pipelineBarrier(
+        vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::DependencyFlagBits::eDeviceGroup,
+        0, nullptr, 0, nullptr, 1, &img_mem_barrier);
+
+    img_mem_barrier.setImage(m_buffer.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(
         vk::PipelineStageFlagBits::eComputeShader,
         vk::PipelineStageFlagBits::eFragmentShader,

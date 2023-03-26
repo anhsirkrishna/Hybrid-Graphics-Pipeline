@@ -7,6 +7,7 @@ class DOFPass : public RenderPass {
 private:
 	ImageWrap m_buffer_bg;
 	ImageWrap m_buffer_fg;
+	ImageWrap m_buffer;
 	void SetupBuffer();
 
 	PushConstantDoF m_push_consts;
@@ -35,6 +36,7 @@ public:
 
 	const ImageWrap& GetBGBuffer() const;
 	const ImageWrap& GetFGBuffer() const;
+	const ImageWrap& GetBuffer() const;
 
 
 	void DrawGUI();
