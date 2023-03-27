@@ -14,6 +14,7 @@
 #include "PreDOFPass.h"
 #include "MedianPass.h"
 #include "UpscalePass.h"
+#include "RayMaskPass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -825,6 +826,10 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_upscale_pass->SetNeighbourBufferDesc(p_neighbour_max_pass->GetBuffer());
     p_upscale_pass->SetDOFPass(p_dof_pass.get());
 
+    //Add a raymask pass to the list of passes
+    std::unique_ptr<RayMaskPass> p_raymask_pass =
+        std::make_unique<RayMaskPass>(this, p_pre_dof_pass.get());
+
     //Add the MBlur pass to the list of passes.
     std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
     p_mblur_pass->SetNeighbourMaxDesc(p_neighbour_max_pass->GetBuffer());
@@ -843,6 +848,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
     p_debug_buffer_pass->SetMedianBuffer(p_median_pass->GetBuffer());
     p_debug_buffer_pass->SetUpscaledBuffer(p_upscale_pass->GetBuffer());
+    p_debug_buffer_pass->SetRaymaskBuffer(p_raymask_pass->GetBuffer());
 
 
     render_passes.push_back(std::move(p_lighting_pass));
@@ -853,6 +859,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     render_passes.push_back(std::move(p_median_pass));
     render_passes.push_back(std::move(p_upscale_pass));
     render_passes.push_back(std::move(p_mblur_pass));
+    render_passes.push_back(std::move(p_raymask_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));
 
     //Setup all the render passes

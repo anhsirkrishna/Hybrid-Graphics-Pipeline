@@ -119,4 +119,10 @@ void main() {
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color;
     }
+    else if (pcDebugBuffer.draw_buffer == 17)
+    {
+        //Draw the Raymask buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color;
+    }
 }

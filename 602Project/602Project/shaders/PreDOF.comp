@@ -101,6 +101,7 @@ void main()
     float curr_depth = max_depth;
     float weight_sums = 0.0f;
     vec3 color_sum = vec3(0.0f);
+    float depth_sum = 0.0f;
     for(int i = 0; i < 3; ++i) {
         for(int j = 0; j < 3; ++j) {
             //Filter tap using circular kernel
@@ -118,13 +119,14 @@ void main()
             float sample_weight = (g_kernel[i][j] * R);
 		    weight_sums += sample_weight;
 		    color_sum += (color_depth.rgb * sample_weight);
+            depth_sum += (sample_weight * sample_weight);
         }
     }
     
 //    if (weight_sums <= 0)
 //        imageStore(out_image, gpos, vec4(vec3(0.0f), 1.0f));
 //    else
-        imageStore(out_image, gpos, vec4(color_sum/weight_sums, 1.0f));
+        imageStore(out_image, gpos, vec4(color_sum/weight_sums, max_depth));
 
     barrier();
     //Finally perform the presorting based on background/foreground depth comparisions.

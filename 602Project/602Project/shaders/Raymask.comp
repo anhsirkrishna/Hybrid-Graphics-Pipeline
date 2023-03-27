@@ -1,0 +1,36 @@
+#version 460
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shared_structs.h"
+
+#define PI 3.14159
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform image2D out_image;
+layout(set = 0, binding = 1) uniform sampler2D downscaled_color_depth;
+
+layout(push_constant) uniform _pc_DOF { PushConstantRaymask pc; };
+
+#include "EdgeDetectionUtil"
+
+void main()
+{
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy);
+
+    vec2 resolution = vec2(textureSize(downscaled_color_depth, 0));
+    
+    vec2 pixel_size = 1.0f / resolution;
+    
+    vec2 load_coord = gpos * pixel_size;
+
+    vec2 grad = getTextureIntensityGradient(downscaled_color_depth, load_coord, resolution);
+
+    float edge_val = length(grad);
+
+    float xn = clamp(1 - (1 / (edge_val+1)), 0.0f, 1.0f);
+
+    imageStore(out_image, gpos, vec4(vec3(xn), 1.0f));
+}

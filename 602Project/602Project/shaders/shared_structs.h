@@ -128,6 +128,12 @@ struct PushConstantMBlur
 	int alignmentTest;
 };
 
+struct PushConstantRaymask
+{
+	float weak_threshold;
+	float strong_threshold;
+};
+
 // Push constant structure for the Pre DoF Pass
 struct PushConstantPreDoF
 {

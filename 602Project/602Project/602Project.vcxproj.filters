@@ -80,6 +80,9 @@
     <ClCompile Include="UpscalePass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="RayMaskPass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -147,6 +150,9 @@
     </ClInclude>
     <ClInclude Include="shaders\util">
       <Filter>shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="RayMaskPass.h">
+      <Filter>Graphics\RenderPasses</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -221,8 +227,14 @@
     <CustomBuild Include="shaders\Upscale.comp">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="shaders\Raymask.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="shaders\EdgeDetectionUtil">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

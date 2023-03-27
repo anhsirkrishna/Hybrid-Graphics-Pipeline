@@ -104,6 +104,7 @@
     <ClCompile Include="MedianPass.cpp" />
     <ClCompile Include="NeighbourMax.cpp" />
     <ClCompile Include="PreDOFPass.cpp" />
+    <ClCompile Include="RayMaskPass.cpp" />
     <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="ScanlineGraphics.cpp" />
     <ClCompile Include="TileMaxPass.cpp" />
@@ -127,6 +128,7 @@
     <ClInclude Include="MedianPass.h" />
     <ClInclude Include="NeighbourMax.h" />
     <ClInclude Include="PreDOFPass.h" />
+    <ClInclude Include="RayMaskPass.h" />
     <ClInclude Include="RenderPass.h" />
     <ClInclude Include="shaders\shared_structs.h" />
     <ClInclude Include="shaders\util" />
@@ -263,9 +265,19 @@
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
     </CustomBuild>
+    <CustomBuild Include="shaders\Raymask.comp">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling shader %(Identity)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">spv\%(Filename)%(Extension).spv</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">shaders\shared_structs.h</AdditionalInputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="shaders\EdgeDetectionUtil" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
