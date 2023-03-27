@@ -2,25 +2,21 @@
 #include "DescriptorWrap.h"
 #include "Graphics.h"
 
-#include "PreDOFPass.h"
+#include "UpscalePass.h"
+#include "MedianPass.h"
 #include "TileMaxPass.h"
-#include "LightingPass.h"
 #include "DOFPass.h"
 
-
-void PreDOFPass::SetupBuffer() {
-    m_buffer.CreateTextureSampler();
-    m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
-
-    m_params_buffer.CreateTextureSampler();
-    m_params_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+void UpscalePass::SetupBuffer() {
+	m_buffer.CreateTextureSampler();
+	m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
-void PreDOFPass::SetupDescriptor() {
+void UpscalePass::SetupDescriptor() {
     m_descriptor.setBindings(p_gfx->GetDeviceRef(), {
         {0, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
-        {1, vk::DescriptorType::eStorageImage, 1,
+        {1, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute},
         {2, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
@@ -30,11 +26,11 @@ void PreDOFPass::SetupDescriptor() {
          vk::ShaderStageFlagBits::eCompute} });
 }
 
-void PreDOFPass::SetupPipeline() {
+void UpscalePass::SetupPipeline() {
     vk::PushConstantRange pc_info;
     pc_info.setStageFlags(vk::ShaderStageFlagBits::eCompute);
     pc_info.setOffset(0);
-    pc_info.setSize(sizeof(PushConstantPreDoF));
+    pc_info.setSize(sizeof(PushConstantDoF));
 
     vk::PipelineLayoutCreateInfo pl_create_info;
     pl_create_info.setSetLayoutCount(1);
@@ -49,7 +45,7 @@ void PreDOFPass::SetupPipeline() {
     vk::PipelineShaderStageCreateInfo shader_stage;
     shader_stage.setStage(vk::ShaderStageFlagBits::eCompute);
     shader_stage.setModule(
-        p_gfx->CreateShaderModule(LoadFileIntoString("spv/PreDOF.comp.spv"))
+        p_gfx->CreateShaderModule(LoadFileIntoString("spv/Upscale.comp.spv"))
     );
     shader_stage.setPName("main");
     cp_create_info.stage = shader_stage;
@@ -62,29 +58,18 @@ void PreDOFPass::SetupPipeline() {
     p_gfx->GetDeviceRef().destroyShaderModule(cp_create_info.stage.module, nullptr);
 }
 
-PreDOFPass::PreDOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : 
-    RenderPass(_p_gfx, _p_prev_pass),
-    m_buffer(p_gfx->GetWindowSize().x/2, p_gfx->GetWindowSize().y/2,
-        vk::Format::eR32G32B32A32Sfloat,
-        vk::ImageUsageFlagBits::eTransferDst |
-        vk::ImageUsageFlagBits::eSampled |
-        vk::ImageUsageFlagBits::eStorage |
-        vk::ImageUsageFlagBits::eTransferSrc |
-        vk::ImageUsageFlagBits::eColorAttachment,
-        vk::ImageAspectFlagBits::eColor,
-        vk::MemoryPropertyFlagBits::eDeviceLocal,
-        1, p_gfx),
-    m_params_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
-        vk::Format::eR32G32B32A32Sfloat,
-        vk::ImageUsageFlagBits::eTransferDst |
-        vk::ImageUsageFlagBits::eSampled |
-        vk::ImageUsageFlagBits::eStorage |
-        vk::ImageUsageFlagBits::eTransferSrc |
-        vk::ImageUsageFlagBits::eColorAttachment,
-        vk::ImageAspectFlagBits::eColor,
-        vk::MemoryPropertyFlagBits::eDeviceLocal,
-        1, p_gfx),
-    m_push_consts(), enabled(true) {
+UpscalePass::UpscalePass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx, _p_prev_pass),
+m_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
+    vk::Format::eR32G32B32A32Sfloat,
+    vk::ImageUsageFlagBits::eTransferDst |
+    vk::ImageUsageFlagBits::eSampled |
+    vk::ImageUsageFlagBits::eStorage |
+    vk::ImageUsageFlagBits::eTransferSrc |
+    vk::ImageUsageFlagBits::eColorAttachment,
+    vk::ImageAspectFlagBits::eColor,
+    vk::MemoryPropertyFlagBits::eDeviceLocal,
+    1, p_gfx), m_push_consts(), enabled(true) {
+
     m_push_consts.lens_diameter = 0.035f;
     m_push_consts.focal_length = 0.05f;
     m_push_consts.focal_distance = 1.0f;
@@ -92,43 +77,40 @@ PreDOFPass::PreDOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
     m_push_consts.soft_z_extent = 0.35f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.alignmentTest = 1234;
+
     SetupBuffer();
     SetupDescriptor();
 }
 
-PreDOFPass::~PreDOFPass() {
+UpscalePass::~UpscalePass() {
     p_gfx->GetDeviceRef().destroyPipelineLayout(m_pipeline_layout);
     p_gfx->GetDeviceRef().destroyPipeline(m_pipeline);
 
     m_descriptor.destroy(p_gfx->GetDeviceRef());
     m_buffer.destroy(p_gfx->GetDeviceRef());
-    m_params_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
-void PreDOFPass::Setup() {
-    WriteToDescriptor(0, m_buffer.Descriptor());
-    WriteToDescriptor(1, m_params_buffer.Descriptor());
-    WriteToDescriptor(2,
-        static_cast<LightingPass*>(p_prev_pass)->GetBufferRef().Descriptor());
-    WriteToDescriptor(3,
-        static_cast<LightingPass*>(p_prev_pass)->GetVeloDepthBufferRef().Descriptor());
-    WriteToDescriptor(4, neighbour_max_buffer_desc);
+void UpscalePass::Setup() {
+    m_descriptor.write(p_gfx->GetDeviceRef(), 0, m_buffer.Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 1,
+        static_cast<MedianPass*>(p_prev_pass)->GetBuffer().Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 2, fullres_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 3, fullres_depth_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 4, neighbour_max_buffer_desc);
     SetupPipeline();
 }
 
-void PreDOFPass::Render() {
+void UpscalePass::Render() {
     if (not enabled)
         return;
-    
+
     //Set the push consts based on DOF params
     m_push_consts.coc_sample_scale = p_dof_pass->GetDOFParams().coc_sample_scale;
     m_push_consts.focal_length = p_dof_pass->GetDOFParams().focal_length;
     m_push_consts.focal_distance = p_dof_pass->GetDOFParams().focal_distance;
     m_push_consts.lens_diameter = p_dof_pass->GetDOFParams().lens_diameter;
-    m_push_consts.soft_z_extent = p_dof_pass->GetDOFParams().soft_z_extent;
 
-
-    LightingPass* p_prev_lighting_pass = static_cast<LightingPass*>(p_prev_pass);
+    MedianPass* p_median_pass = static_cast<MedianPass*>(p_prev_pass);
     vk::ImageSubresourceRange range;
     range.setAspectMask(vk::ImageAspectFlagBits::eColor);
     range.setBaseMipLevel(0);
@@ -139,7 +121,7 @@ void PreDOFPass::Render() {
     vk::ImageMemoryBarrier img_mem_barrier;
     img_mem_barrier.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
     img_mem_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-    img_mem_barrier.setImage(p_prev_lighting_pass->GetBufferRef().GetImage());
+    img_mem_barrier.setImage(p_median_pass->GetBuffer().GetImage());
     img_mem_barrier.setOldLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setNewLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setSubresourceRange(range);
@@ -150,7 +132,6 @@ void PreDOFPass::Render() {
         vk::DependencyFlagBits::eDeviceGroup,
         0, nullptr, 0, nullptr, 1, &img_mem_barrier);
 
-    // Select the compute shader, and its descriptor set and push constant
     p_gfx->GetCommandBuffer().bindPipeline(
         vk::PipelineBindPoint::eCompute,
         m_pipeline);
@@ -160,16 +141,12 @@ void PreDOFPass::Render() {
         &m_descriptor.descSet, 0, nullptr);
     p_gfx->GetCommandBuffer().pushConstants(m_pipeline_layout,
         vk::ShaderStageFlagBits::eCompute, 0,
-        sizeof(PushConstantPreDoF),
+        sizeof(PushConstantDoF),
         &m_push_consts);
 
-    // This MUST match the shaders's line:
-    //    layout(local_size_x=GROUP_SIZE, local_size_y=1, local_size_z=1) in;
-    int GROUP_SIZE = 32;
     p_gfx->GetCommandBuffer().dispatch(
-        (p_gfx->GetWindowSize().x / 2)/GROUP_SIZE,
-        (p_gfx->GetWindowSize().y / 2)/GROUP_SIZE, 
-        1);
+        (p_gfx->GetWindowSize().x),
+        (p_gfx->GetWindowSize().y), 1);
 
     img_mem_barrier.setImage(m_buffer.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(
@@ -177,41 +154,32 @@ void PreDOFPass::Render() {
         vk::PipelineStageFlagBits::eFragmentShader,
         vk::DependencyFlagBits::eDeviceGroup,
         0, nullptr, 0, nullptr, 1, &img_mem_barrier);
-    
-    img_mem_barrier.setImage(m_params_buffer.GetImage());
-    p_gfx->GetCommandBuffer().pipelineBarrier(
-        vk::PipelineStageFlagBits::eComputeShader,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        vk::DependencyFlagBits::eDeviceGroup,
-        0, nullptr, 0, nullptr, 1, &img_mem_barrier);
 }
 
-void PreDOFPass::Teardown() {
+void UpscalePass::Teardown()
+{
 }
 
-void PreDOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info) {
-    m_descriptor.write(p_gfx->GetDeviceRef(), index, img_desc_info);
+void UpscalePass::DrawGUI()
+{
 }
 
-void PreDOFPass::SetNeighbourMaxBufferDesc(const ImageWrap& buffer) {
-    neighbour_max_buffer_desc = buffer.Descriptor();
-}
-
-void PreDOFPass::SetDOFPass(DOFPass* _p_dof_pass) {
-    p_dof_pass = _p_dof_pass;
-}
-
-const ImageWrap& PreDOFPass::GetBuffer() const {
+const ImageWrap& UpscalePass::GetBuffer() const {
     return m_buffer;
 }
 
-const ImageWrap& PreDOFPass::GetParamsBuffer() const {
-    return m_params_buffer;
+void UpscalePass::SetFullResBufferDesc(const ImageWrap& _buffer) {
+    fullres_buffer_desc = _buffer.Descriptor();
 }
 
-void PreDOFPass::DrawGUI() {
-    ImGui::Checkbox("Enable PreDOF pass", &enabled);
-
-    
+void UpscalePass::SetFullResDepthBufferDesc(const ImageWrap& _buffer) {
+    fullres_depth_buffer_desc = _buffer.Descriptor();
 }
 
+void UpscalePass::SetNeighbourBufferDesc(const ImageWrap& _buffer) {
+    neighbour_max_buffer_desc = _buffer.Descriptor();
+}
+
+void UpscalePass::SetDOFPass(DOFPass* _p_dof_pass) {
+    p_dof_pass = _p_dof_pass;
+}

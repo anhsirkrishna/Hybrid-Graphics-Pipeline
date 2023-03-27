@@ -1,0 +1,15 @@
+#define PI 3.14159
+#define DOF_SINGLE_PIXEL_RADIUS 0.7071
+
+//The following equation is from Potmesil 1981
+float CaclulateCoCDiameter(float depth) {
+    float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) *
+        (abs(depth - pc.focal_distance) / depth);
+    return min(Cr * pc.coc_sample_scale, pc.tile_size);
+}
+
+//The following function is from Jiminez 2014
+float SampleAlpha(float sample_coc) {
+    return min(1.0f / (PI * sample_coc * sample_coc),
+        1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
+}

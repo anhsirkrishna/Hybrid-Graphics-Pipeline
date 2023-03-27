@@ -2,6 +2,7 @@
 #include "RenderPass.h"
 
 class Graphics;
+class DOFPass;
 
 class BufferDebugDraw : public RenderPass {
 public:
@@ -21,7 +22,8 @@ public:
 		DOF_FG,
 		DOF,
 		DOF_ALPHA,
-		MEDIAN
+		MEDIAN,
+		UPSCALED
 	};
 
 private:
@@ -34,6 +36,7 @@ private:
 	vk::DescriptorImageInfo dof_fg_buffer_desc;
 	vk::DescriptorImageInfo dof_buffer_desc;
 	vk::DescriptorImageInfo median_buffer_desc;
+	vk::DescriptorImageInfo upscaled_buffer_desc;
 	void SetDrawBuffer(vk::DescriptorImageInfo& draw_descriptor);
 
 	DescriptorWrap m_descriptor;
@@ -52,6 +55,8 @@ private:
 	DrawBuffer draw_buffer;
 
 	PushConstantDrawBuffer m_push_consts;
+
+	DOFPass* p_dof_pass;
 public:
 	BufferDebugDraw(Graphics* _p_gfx, RenderPass* p_prev_pass = nullptr);
 	~BufferDebugDraw();
@@ -68,7 +73,10 @@ public:
 	void SetDOFFGBuffer(const ImageWrap& draw_buffer);
 	void SetDOFBuffer(const ImageWrap& draw_buffer);
 	void SetMedianBuffer(const ImageWrap& draw_buffer);
+	void SetUpscaledBuffer(const ImageWrap& draw_buffer);
 
 	void DrawGUI();
+
+	void SetDOFPass(DOFPass* _p_dof_pass);
 };
 

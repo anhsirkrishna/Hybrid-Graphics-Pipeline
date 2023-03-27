@@ -2,6 +2,7 @@
 
 #include "BufferDebugDraw.h"
 #include "TileMaxPass.h"
+#include "DOFPass.h"
 
 void BufferDebugDraw::SetupDescriptor() {
     m_descriptor.setBindings(p_gfx->GetDeviceRef(), {
@@ -187,6 +188,7 @@ BufferDebugDraw::BufferDebugDraw(Graphics* _p_gfx, RenderPass* p_prev_pass) :
     SetupPipeline();
     m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
     m_push_consts.tile_size = TileMaxPass::tile_size;
+    m_push_consts.dof_coc_sample_scale = 800.0f;
     m_push_consts.alignmentTest = 1234;
 }
 
@@ -207,6 +209,8 @@ void BufferDebugDraw::Setup() {
 void BufferDebugDraw::Render() {
     if (draw_buffer == DrawBuffer::DISABLE)
         return;
+
+    m_push_consts.dof_coc_sample_scale = p_dof_pass->GetDOFParams().coc_sample_scale;
 
     std::array<vk::ClearValue, 2> clearValues;
     clearValues[0].color = vk::ClearColorValue(std::array<float, 4>({ { 1.0f, 1.0f, 1.0f, 1.0f } }));
@@ -282,6 +286,10 @@ void BufferDebugDraw::SetDOFBuffer(const ImageWrap& draw_buffer) {
 
 void BufferDebugDraw::SetMedianBuffer(const ImageWrap& draw_buffer) {
     median_buffer_desc = draw_buffer.Descriptor();
+}
+
+void BufferDebugDraw::SetUpscaledBuffer(const ImageWrap& draw_buffer) {
+    upscaled_buffer_desc = draw_buffer.Descriptor();
 }
 
 void BufferDebugDraw::DrawGUI() {
@@ -380,6 +388,16 @@ void BufferDebugDraw::DrawGUI() {
             SetDrawBuffer(median_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
+        if (ImGui::MenuItem("Draw Upscaled Buffer", "", draw_buffer == DrawBuffer::UPSCALED)) {
+            draw_buffer = DrawBuffer::UPSCALED;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(upscaled_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
         ImGui::EndMenu();
     }
+}
+
+void BufferDebugDraw::SetDOFPass(DOFPass* _p_dof_pass) {
+    p_dof_pass = _p_dof_pass;
 }

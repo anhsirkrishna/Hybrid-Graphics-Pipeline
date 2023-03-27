@@ -134,7 +134,7 @@ struct PushConstantPreDoF
 	float focal_length;
 	float focal_distance;
 	float lens_diameter;
-	float depth_scale_fg;
+	float soft_z_extent;
 	float coc_sample_scale;
 	int tile_size;
 	int alignmentTest;
@@ -146,7 +146,7 @@ struct PushConstantDoF
   float focal_length;
   float focal_distance;
   float lens_diameter;
-  float depth_scale_fg;
+  float soft_z_extent;
   float coc_sample_scale;
   int tile_size;
   int alignmentTest;
@@ -173,6 +173,7 @@ struct PushConstantNeighbourMax
 struct PushConstantDrawBuffer
 {
 	int draw_buffer;
+	float dof_coc_sample_scale;
 	int tile_size;
 	int alignmentTest;
 };

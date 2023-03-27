@@ -5,8 +5,6 @@
 
 #include "shared_structs.h"
 
-#define DOF_SINGLE_PIXEL_RADIUS 0.7071
-
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, rgba32f) uniform image2D out_image;
@@ -17,7 +15,8 @@ layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
 
 layout(push_constant) uniform _pc_DOF { PushConstantPreDoF pc; };
 
-float PI = 3.14159;
+#include "util"
+
 const float s = 0.01;
 const float epsilon = 0.000001;
 
@@ -67,26 +66,8 @@ vec2 ToUnitDisk(vec2 onSquare) {
     return vec2(u,v);
 }
 
-//The following equation is from Potmesil 1981
-float CaclulateCoCDiameter(float depth) {
-    float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) * 
-                ( abs(depth - pc.focal_distance) / depth );
-    return Cr * pc.coc_sample_scale;
-}
-
-//The following functions are from Jiminez 2014
-vec2 DepthCompare(float depth, float min_depth) {
-    float d = pc.depth_scale_fg * (depth - min_depth);
-    vec2 depthCmp;
-    depthCmp.x = smoothstep(0.0f, 1.0f, d); //Background
-    depthCmp.y = 1.0f - depthCmp.x; //Foregroun d
-
-    return depthCmp;
-}
-
-float SampleAlpha(float sample_coc) {
-    return min( 1.0f / (PI * sample_coc * sample_coc),
-                1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
+float SoftDepthCompare(float depth1, float depth2) {
+    return clamp(1 - (depth1 - depth2) / pc.soft_z_extent, 0, 1);
 }
 
 void main()
@@ -140,9 +121,9 @@ void main()
         }
     }
     
-    if (weight_sums <= 0)
-        imageStore(out_image, gpos, vec4(vec3(0.0f), 1.0f));
-    else
+//    if (weight_sums <= 0)
+//        imageStore(out_image, gpos, vec4(vec3(0.0f), 1.0f));
+//    else
         imageStore(out_image, gpos, vec4(color_sum/weight_sums, 1.0f));
 
     barrier();
@@ -151,12 +132,15 @@ void main()
     float neighbour_min_depth = 
         imageLoad(neighbour_max_buffer, ivec2(downscale_load_pos/pc.tile_size)).z;
     
-    vec2 depth_cmp = DepthCompare(max_depth, neighbour_min_depth);
+    float depth_cmp_bg = SoftDepthCompare(neighbour_min_depth, curr_depth);
+    float depth_cmp_fg = SoftDepthCompare(curr_depth, neighbour_min_depth);
+
     float sample_alpha = SampleAlpha(coc_radius);
+    sample_alpha = 1.0f;
     vec4 params;
     params.r = coc_radius;
-    params.g = sample_alpha * depth_cmp.x;
-    params.b = sample_alpha * depth_cmp.y;
+    params.g = sample_alpha * depth_cmp_bg;
+    params.b = sample_alpha * depth_cmp_fg;
     params.a = 1.0f;
 
     imageStore(out_params, gpos, params);

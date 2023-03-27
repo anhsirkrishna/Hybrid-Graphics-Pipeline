@@ -19,7 +19,7 @@ layout(set = 0, binding = 5, rgba32f) uniform image2D out_image;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
-float PI = 3.14159;
+#include "util"
 
 //The following function is from Shirley 1997
 vec2 ToUnitDisk(vec2 onSquare) {
@@ -61,20 +61,12 @@ vec2 ToUnitDisk(vec2 onSquare) {
     return vec2(u,v);
 }
 
-//The following equation is from Potmesil 1981
-float CaclulateCoCDiameter(float depth) {
-    float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) * 
-                ( abs(depth - pc.focal_distance) / depth );
-    return Cr * pc.coc_sample_scale;
+float SpreadCompare(vec2 X, vec2 Y, float coc_radius) {
+    return clamp(1 - length(X-Y)/coc_radius, 0, 1);
 }
 
-float SpreadCompare(float offset_coc, float sample_coc) {
-    return clamp(sample_coc - max(offset_coc - 1.0f, 0.0f), 0.0f, 1.0f);
-}
-
-float SampleAlpha(float sample_coc) {
-    return min( 1.0f / (PI * sample_coc * sample_coc),
-                1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
+float SpreadCompareSimul(vec2 X, vec2 Y, float coc_radius) {
+    return 1.0 - smoothstep(0.95f*coc_radius, 1.05f*coc_radius, length(X-Y));
 }
 
 void main()
@@ -105,23 +97,27 @@ void main()
                 //Depth stored in the w component.
                 vec4 sample_params = imageLoad(pre_params_buffer, load_pos);
 
-                float spread_cmp = SpreadCompare(coc_radius, sample_params.r);
+                float spread_cmp_bg = SpreadCompare(gpos, load_pos, coc_radius);
+                float spread_cmp_fg = SpreadCompare(load_pos, gpos, sample_params.r);
+
+                float spread_cmp_simul = 
+                    SpreadCompareSimul(load_pos, gpos, sample_params.r) *
+                    SpreadCompareSimul(gpos, load_pos, coc_radius) *
+                    2;
 
                 //Foreground vs background classification
-                float bg = sample_params.g * spread_cmp;
-                float fg = sample_params.b * spread_cmp;
-                bg = sample_params.g;
-                fg = sample_params.b;
+                float bg = (sample_params.g * spread_cmp_bg) + spread_cmp_simul;
+                float fg = (sample_params.b * spread_cmp_fg) + spread_cmp_simul;
                 
                 vec3 sample_color = imageLoad(color_depth_buffer, load_pos).rgb;
-                out_color_bg += max(bg, 0.0f) * vec4(sample_color, 1.0);
-                out_color_fg += max(fg, 0.0f) * vec4(sample_color, 1.0);
+                out_color_bg += (bg * vec4(sample_color, 1.0));
+                out_color_fg += (fg * vec4(sample_color, 1.0));
                 sample_count++;
             }
         }
     }
     float alpha = 
-        clamp((2.0 * (1.0 / sample_count) * (1.0 / SampleAlpha(coc_radius)) * (out_color_fg.a)), 
+        clamp((2.0 * (1.0 / sample_count) * (out_color_fg.a)), 
                0.0f, 1.0f);
     vec3 out_color = mix(out_color_bg.rgb/out_color_bg.a, out_color_fg.rgb/out_color_fg.a, alpha);
 

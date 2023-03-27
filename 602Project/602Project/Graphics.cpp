@@ -13,6 +13,7 @@
 #include "MBlurPass.h"
 #include "PreDOFPass.h"
 #include "MedianPass.h"
+#include "UpscalePass.h"
 
 #include <iostream>
 #include "extensions_vk.hpp"
@@ -795,7 +796,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     //Add the TileMaxPass to the list of passes.
     std::unique_ptr<TileMaxPass> p_tile_max_pass =
         std::make_unique<TileMaxPass>(this, p_lighting_pass.get());
-
+    //Add the NeighbourMax to the list of passes.
     std::unique_ptr<NeighbourMax> p_neighbour_max_pass =
         std::make_unique<NeighbourMax>(this, p_tile_max_pass.get());
 
@@ -807,16 +808,22 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     //Add the depth of field pass to the list of passes.
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_pre_dof_pass.get());
     p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
-
-    //Add the median pass to the list of passes.
-    std::unique_ptr<MedianPass> p_median_pass = 
-        std::make_unique<MedianPass>(this, p_dof_pass.get());
-
     //Make sure TileMaxPass can access DOFPass for the DOF parameters
     p_tile_max_pass->SetDOFPass(p_dof_pass.get());
-
     //Make sure PreDOFPass can access DOFPass for the DOF parameters
     p_pre_dof_pass->SetDOFPass(p_dof_pass.get());
+
+    //Add the median pass to the list of passes.
+    std::unique_ptr<MedianPass> p_median_pass =
+        std::make_unique<MedianPass>(this, p_dof_pass.get());
+
+    //Add the upscale pass to the list of passes
+    std::unique_ptr<UpscalePass> p_upscale_pass = 
+        std::make_unique<UpscalePass>(this, p_median_pass.get());
+    p_upscale_pass->SetFullResBufferDesc(p_lighting_pass->GetBufferRef());
+    p_upscale_pass->SetFullResDepthBufferDesc(p_lighting_pass->GetVeloDepthBufferRef());
+    p_upscale_pass->SetNeighbourBufferDesc(p_neighbour_max_pass->GetBuffer());
+    p_upscale_pass->SetDOFPass(p_dof_pass.get());
 
     //Add the MBlur pass to the list of passes.
     std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
@@ -825,6 +832,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     //Add the debug buffer draw pass to the list of passes.
     std::unique_ptr<BufferDebugDraw> p_debug_buffer_pass = 
         std::make_unique<BufferDebugDraw>(this, p_dof_pass.get());
+    p_debug_buffer_pass->SetDOFPass(p_dof_pass.get());
     p_debug_buffer_pass->SetVeloDepthBuffer(p_lighting_pass->GetVeloDepthBufferRef());
     p_debug_buffer_pass->SetTileMaxBuffer(p_tile_max_pass->GetBuffer());
     p_debug_buffer_pass->SetNeighbourMaxBuffer(p_neighbour_max_pass->GetBuffer());
@@ -834,6 +842,8 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetDOFFGBuffer(p_dof_pass->GetFGBuffer());
     p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
     p_debug_buffer_pass->SetMedianBuffer(p_median_pass->GetBuffer());
+    p_debug_buffer_pass->SetUpscaledBuffer(p_upscale_pass->GetBuffer());
+
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));
@@ -841,6 +851,7 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     render_passes.push_back(std::move(p_pre_dof_pass));
     render_passes.push_back(std::move(p_dof_pass));
     render_passes.push_back(std::move(p_median_pass));
+    render_passes.push_back(std::move(p_upscale_pass));
     render_passes.push_back(std::move(p_mblur_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));
 
@@ -1078,26 +1089,6 @@ vk::ShaderModule Graphics::CreateShaderModule(std::string code) {
 
     return m_device.createShaderModule(sm_createInfo);
 }
-//
-//void Graphics::CopyBufferToImage(vk::Buffer buffer, vk::Image image, 
-//    uint32_t width, uint32_t height) {
-//    VkCommandBuffer commandBuffer = CreateTempCommandBuffer();
-//
-//    VkBufferImageCopy region{};
-//    region.bufferOffset = 0;
-//    region.bufferRowLength = 0;
-//    region.bufferImageHeight = 0;
-//    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//    region.imageSubresource.mipLevel = 0;
-//    region.imageSubresource.baseArrayLayer = 0;
-//    region.imageSubresource.layerCount = 1;
-//    region.imageOffset = { 0, 0, 0 };
-//    region.imageExtent = { width, height, 1 };
-//
-//    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-//
-//    SubmitTempCommandBuffer(commandBuffer);
-//}
 
 BufferWrap Graphics::CreateStagedBufferWrap(const vk::CommandBuffer& cmdBuf, const vk::DeviceSize& size, 
     const void* data, vk::BufferUsageFlags usage) {

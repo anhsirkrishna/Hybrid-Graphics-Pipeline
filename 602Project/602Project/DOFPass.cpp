@@ -47,13 +47,13 @@ void DOFPass::DrawGUI() {
     ImGui::SliderFloat("CoC sample scale : ", &m_push_consts.coc_sample_scale,
         0.0f, 1000.0f);
     ImGui::SliderFloat("Focal Distance : ", &m_push_consts.focal_distance,
-        0.1f, 10.0f);
+        0.1f, 2.0f);
     ImGui::SliderFloat("Focal length : ", &m_push_consts.focal_length,
         0.01f, 0.09f);
     ImGui::SliderFloat("Lens Diameter : ", &m_push_consts.lens_diameter,
         0.01f, 0.2f);
-    ImGui::SliderFloat("Depth Scale FG", &m_push_consts.depth_scale_fg,
-        0.1f, 2.0f);
+    ImGui::SliderFloat("DOF soft z extent", &m_push_consts.soft_z_extent,
+        0.01f, 0.05f);
 
     //Set the position of the camera to demonstrate DOF
     if (ImGui::Button("Set DOF Eye Pos")) {
@@ -154,7 +154,7 @@ DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx
     m_push_consts.focal_length = 0.05f;
     m_push_consts.focal_distance = 1.0f;
     m_push_consts.coc_sample_scale = 800.0f;
-    m_push_consts.depth_scale_fg = 0.15f;
+    m_push_consts.soft_z_extent = 0.001f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
     m_push_consts.alignmentTest = 1234;
     SetupBuffer();

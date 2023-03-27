@@ -42,7 +42,8 @@ void main() {
     else if (pcDebugBuffer.draw_buffer == 3) 
     {
         //Draw the TILEMAX_COC buffer
-        fragColor = vec4(texture(renderedImage, uv).w);
+        float display_coc = texture(renderedImage, uv).w / pcDebugBuffer.tile_size;
+        fragColor = vec4(display_coc);
     }
     else if (pcDebugBuffer.draw_buffer == 4) 
     {
@@ -52,7 +53,8 @@ void main() {
     else if (pcDebugBuffer.draw_buffer == 5) 
     {
         //Draw the NEIGHBOURMAX_COC buffer
-        fragColor = vec4(texture(renderedImage, uv).w);
+        float display_coc = texture(renderedImage, uv).w / pcDebugBuffer.tile_size;
+        fragColor = vec4(display_coc);
     }
     else if (pcDebugBuffer.draw_buffer == 6) 
     {
@@ -108,6 +110,12 @@ void main() {
     else if (pcDebugBuffer.draw_buffer == 15)
     {
         //Draw the Median buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color;
+    }
+    else if (pcDebugBuffer.draw_buffer == 16)
+    {
+        //Draw the Upscaled buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color;
     }

@@ -77,6 +77,9 @@
     <ClCompile Include="MedianPass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="UpscalePass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -138,6 +141,12 @@
     </ClInclude>
     <ClInclude Include="MedianPass.h">
       <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="UpscalePass.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\util">
+      <Filter>shaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -207,6 +216,9 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="shaders\Median.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\Upscale.comp">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>
