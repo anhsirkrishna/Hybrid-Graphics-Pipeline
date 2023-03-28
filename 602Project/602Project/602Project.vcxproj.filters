@@ -83,6 +83,12 @@
     <ClCompile Include="RayMaskPass.cpp">
       <Filter>Graphics\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="RayCastPass.cpp">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="AccelerationWrap.cpp">
+      <Filter>Graphics\Wraps</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extensions_vk.hpp">
@@ -153,6 +159,12 @@
     </ClInclude>
     <ClInclude Include="RayMaskPass.h">
       <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="RayCastPass.h">
+      <Filter>Graphics\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="AccelerationWrap.h">
+      <Filter>Graphics\Wraps</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -228,6 +240,15 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="shaders\Raymask.comp">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\Raytrace.rchit">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\Raytrace.rgen">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\Raytrace.rmiss">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>

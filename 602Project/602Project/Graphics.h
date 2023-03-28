@@ -119,12 +119,6 @@ private:
 	//Destroy the created vk::SwapchainKHR
 	void DestroySwapchain();
 
-	//Create a temporary command buffer
-	vk::CommandBuffer CreateTempCommandBuffer();
-
-	//Submit a command through a temporary command buffer
-	void SubmitTempCommandBuffer(vk::CommandBuffer cmd_buffer);
-
 	//Create the depth image wrap (aka the depth buffer)
 	void CreateDepthResource();
 
@@ -231,6 +225,11 @@ public:
 		return CreateStagedBufferWrap(cmdBuf, sizeof(T) * data.size(), data.data(), usage);
 	}
 
+	//Create a temporary command buffer
+	vk::CommandBuffer CreateTempCommandBuffer();
+
+	//Submit a command through a temporary command buffer
+	void SubmitTempCommandBuffer(vk::CommandBuffer cmd_buffer);
 
 	BufferWrap CreateBufferWrap(vk::DeviceSize size, vk::BufferUsageFlags usage,
 		vk::MemoryPropertyFlags properties);

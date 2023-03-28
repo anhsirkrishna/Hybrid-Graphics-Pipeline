@@ -125,4 +125,16 @@ void main() {
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color;
     }
+    else if (pcDebugBuffer.draw_buffer == 18)
+    {
+        //Draw the RayCast bg buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color;
+    }
+    else if (pcDebugBuffer.draw_buffer == 19)
+    {
+        //Draw the RayCast fg buffer
+        vec4 out_color = texture(renderedImage, uv);
+        fragColor = out_color;
+    }
 }

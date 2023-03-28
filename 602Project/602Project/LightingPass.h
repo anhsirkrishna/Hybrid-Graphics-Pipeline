@@ -36,5 +36,8 @@ public:
 
 	const ImageWrap& GetBufferRef() const;
 	const ImageWrap& GetVeloDepthBufferRef() const;
+
+	const DescriptorWrap& GetDescriptor() const;
+	const PushConstantRaster& GetPCParams() const;
 };
 

@@ -24,7 +24,9 @@ public:
 		DOF_ALPHA,
 		MEDIAN,
 		UPSCALED,
-		RAYMASK
+		RAYMASK,
+		RAYCAST_BG,
+		RAYCAST_FG
 	};
 
 private:
@@ -39,6 +41,8 @@ private:
 	vk::DescriptorImageInfo median_buffer_desc;
 	vk::DescriptorImageInfo upscaled_buffer_desc;
 	vk::DescriptorImageInfo raymask_buffer_desc;
+	vk::DescriptorImageInfo raycast_bg_buffer_desc;
+	vk::DescriptorImageInfo raycast_fg_buffer_desc;
 	void SetDrawBuffer(vk::DescriptorImageInfo& draw_descriptor);
 
 	DescriptorWrap m_descriptor;
@@ -77,6 +81,8 @@ public:
 	void SetMedianBuffer(const ImageWrap& draw_buffer);
 	void SetUpscaledBuffer(const ImageWrap& draw_buffer);
 	void SetRaymaskBuffer(const ImageWrap& draw_buffer);
+	void SetRaycastBGBuffer(const ImageWrap& draw_buffer);
+	void SetRaycastFGBuffer(const ImageWrap& draw_buffer);
 
 	void DrawGUI();
 

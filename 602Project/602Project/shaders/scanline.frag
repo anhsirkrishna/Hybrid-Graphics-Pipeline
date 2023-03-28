@@ -49,9 +49,9 @@ void main()
     int               matIndex = matIndices.i[gl_PrimitiveID];
     Material mat      = materials.m[matIndex];
 
-    float lightIntensity = 2.5f;
-    float ambientLight = 0.2f;
-    vec3 lightPosition = vec3( 0.5f, 2.5f, 3.0f );
+    vec3 lightIntensity = pcRaster.lightIntensity.rgb;
+    vec3 ambientLight = pcRaster.ambientIntensity.rgb;
+    vec3 lightPosition = pcRaster.lightPosition.xyz;
 
     vec3 N = normalize(worldNrm);
     vec3 V = normalize(viewDir);

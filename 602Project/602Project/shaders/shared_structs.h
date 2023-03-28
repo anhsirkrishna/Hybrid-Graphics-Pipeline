@@ -69,6 +69,8 @@ struct PushConstantRaster
 {
   mat4  modelMatrix;  // matrix of the instance
   vec4 lightPosition;
+  vec4 lightIntensity;
+  vec4 ambientIntensity;
   vec2 window_size;
   uint  objIndex;
   float exposure_time;
@@ -80,26 +82,11 @@ struct PushConstantRaster
 // Push constant structure for the ray tracer
 struct PushConstantRay
 {
-	/*
-  int   randSeed;
-  int   randSeed2;
-  int   frame;
-  bool  historyView;
-  float jitter;
-  float numSteps;
-  bool  ExplicitLightRays;
-  float posTolerance;
-  float np_m;
-  float np_b;
-  bool  useHistory;*/
+	vec4 lightPosition;
+	vec4 lightIntensity;
+	vec4 ambientIntensity;
 	uint frameSeed;
-	int depth;
-	float rr;
-	float emissionFactor;
-	BOOL (clear);
-	BOOL (diffuseOnly);
-	BOOL (specular);
-	BOOL (explicitPaths);
+	int ray_count_factor;
 	int alignmentTest;
 };
 

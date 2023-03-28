@@ -1,0 +1,206 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64  : require
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "shared_structs.h"
+
+float pi = 3.14159;
+
+// The ray payload, attached to a ray; used to communicate between shader stages.
+layout(location=0) rayPayloadEXT RayPayload payload;
+
+// Push constant for ray tracing shaders
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
+
+// Ray tracing descriptor set: 0:acceleration structure, and 1: color output image
+layout(set=0, binding=0) uniform accelerationStructureEXT topLevelAS;
+layout(set=0, binding=1, rgba32f) uniform image2D color_buffer_bg;
+layout(set=0, binding=2, rgba32f) uniform image2D color_buffer_fg;
+layout(set=0, binding=3, rgba32f) uniform image2D raymask_buffer;
+
+// Object model descriptor set: 0: matrices, 1:object buffer addresses, 2: texture list
+layout(set=1, binding=0) uniform _MatrixUniforms { MatrixUniforms mats; };
+layout(set=1, binding=1, scalar) buffer ObjDesc_ { ObjDesc i[]; } objDesc;
+layout(set=1, binding=2) uniform sampler2D textureSamplers[];
+
+// Object buffered data; dereferenced from ObjDesc addresses
+layout(buffer_reference, scalar) buffer Vertices {Vertex v[]; }; // Position, normals, ..
+layout(buffer_reference, scalar) buffer Indices {ivec3 i[]; }; // Triangle indices
+layout(buffer_reference, scalar) buffer Materials {Material m[]; }; // Array of all materials
+layout(buffer_reference, scalar) buffer MatIndices {int i[]; }; // Material ID for each triangle
+
+
+// Generate a random unsigned int from two unsigned int values, using 16 pairs
+// of rounds of the Tiny Encryption Algorithm. See Zafar, Olano, and Curtis,
+// "GPU Random Numbers via the Tiny Encryption Algorithm"
+uint tea(uint val0, uint val1)
+{
+  uint v0 = val0;
+  uint v1 = val1;
+  uint s0 = 0;
+
+  for(uint n = 0; n < 16; n++)
+  {
+    s0 += 0x9e3779b9;
+    v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+    v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+  }
+
+  return v0;
+}
+
+// Generate a random unsigned int in [0, 2^24) given the previous RNG state
+// using the Numerical Recipes linear congruential generator
+uint lcg(inout uint prev)
+{
+    uint LCG_A = 1664525u;
+    uint LCG_C = 1013904223u;
+    prev       = (LCG_A * prev + LCG_C);
+    return prev & 0x00FFFFFF;
+}
+
+// Generate a random float in [0, 1) given the previous RNG state
+float rnd(inout uint prev)
+{
+    return (float(lcg(prev)) / float(0x01000000));
+}
+
+// Returns a vector around A, at a "polar" angle cos=cTheta, and an "equatorial" angle Phi
+vec3 SampleLobe(vec3 A, float cTheta, float Phi)
+{
+    float sTheta = sqrt(1- cTheta*cTheta); // Sine of Theta
+    vec3 K = vec3(sTheta*cos(Phi), sTheta*sin(Phi), cTheta); // Vector centered on Z instead of A
+
+
+    // Form coordinate frame around A
+    if (abs(A.z-1.0) < 1e-3) return K;
+    if (abs(A.z+1.0) < 1e-3) return vec3(K[0], -K[1], -K[2]);
+    vec3 B = normalize(vec3(-A[1], A[0], 0.0)); // Z x A
+    vec3 C = cross(A,B);
+    
+    // Rotate Z to A, taking K along with
+    return K[0]*B + K[1]*C + K[2]*A;
+}
+
+// @@ Implement these:
+
+// Returns *almost* the full lighting calculation.
+// Full lighting calculation includes I (N dot L) BRDF(...)
+// This excludes light I;    returns    (N dot L) BRDF(...)
+// returns full  NL*(Kd/pi+F*G*D/den);  or diffuse only NL*(Kd/pi) lighting calc.
+vec3 EvalBrdf(vec3 N, vec3 L, vec3 V, Material mat) {
+    vec3 H = normalize(L+V);
+
+    vec3 Kd = mat.diffuse;
+    vec3 Ks = mat.specular;
+    float alpha = mat.shininess;
+
+    float NL = max(dot(N, L), 0.0);
+    float NH = max(dot(N, H), 0.0);
+    float LH = max(dot(L, H), 0.0);
+
+    vec3 brdf;
+    float distribution;
+
+    vec3 fresnel = Ks + ((vec3(1,1,1) - Ks)*pow((1-LH), 5));
+    float visibility = 1/(LH*LH);
+
+    distribution = ((alpha+2)/(2*pi))*pow(NH, alpha);
+    brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
+
+    return NL * brdf;
+}
+
+void main() 
+{
+    if (pcRay.alignmentTest != 1234) {
+        imageStore(color_buffer_bg, ivec2(gl_LaunchIDEXT.xy), vec4(1,0,0,0));
+        return;
+    }
+
+    // @@ In shaders/shared_structs.h add some random number functionality:
+    //  To PushConstantRay add uint frameSeed and initialize to rand() % 32768 in VkApp::raytrace
+    //  To RayPayload, add uint seed, and initialize like this:
+    payload.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, pcRay.frameSeed);
+
+    // This invocation is for a pixel indicated by gl_LaunchIDEXT
+    ivec2 gpos = ivec2(gl_LaunchIDEXT.xy);
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    vec2 pixelNDC = pixelCenter/vec2(gl_LaunchSizeEXT.xy)*2.0 - 1.0;
+ 
+    vec3 eyeW    = (mats.viewInverse * vec4(0, 0, 0, 1)).xyz;
+    vec4 pixelH = mats.viewInverse * mats.projInverse * vec4(pixelNDC.x, pixelNDC.y, 1, 1);
+    vec3 pixelW = pixelH.xyz/pixelH.w;
+    
+    vec3 rayO    = eyeW;
+    vec3 rayD = normalize(pixelW - eyeW);
+    payload.hit = false;
+    payload.hitDist = 0;
+
+    vec3 out_color;
+
+    // Fire the ray;  hit or miss shaders will be invoked, passing results back in the payload
+    traceRayEXT(topLevelAS,           // acceleration structure
+                gl_RayFlagsOpaqueEXT, // rayFlags
+                0xFF,                 // cullMask
+                0,                    // sbtRecordOffset
+                0,                    // sbtRecordStride
+                0,                    // missIndex
+                rayO,                 // ray origin
+                0.001,                // ray min range
+                rayD,                 // ray direction
+                10000.0,              // ray max range
+                0                     // payload (location = 0)
+                );
+
+    // If nothing was hit, output background color.
+    if (!payload.hit)
+        return;
+
+    // Normal light path
+    // If something was hit, find the object data.
+    // Object data (containing 4 device addresses)
+    ObjDesc    objResources = objDesc.i[payload.instanceIndex];
+    
+    // Dereference the object's 4 device addresses
+    Vertices   vertices    = Vertices(objResources.vertexAddress);
+    Indices    indices     = Indices(objResources.indexAddress);
+    Materials  materials   = Materials(objResources.materialAddress);
+    MatIndices matIndices  = MatIndices(objResources.materialIndexAddress);
+  
+    // Use gl_PrimitiveID to access the triangle's vertices and material
+    ivec3 ind    = indices.i[payload.primitiveIndex]; // The triangle hit
+    int matIdx   = matIndices.i[payload.primitiveIndex]; // The triangles material index
+    Material mat = materials.m[matIdx]; // The triangles material
+
+    // Vertex of the triangle (Vertex has pos, nrm, tex)
+    Vertex v0 = vertices.v[ind.x];
+    Vertex v1 = vertices.v[ind.y];
+    Vertex v2 = vertices.v[ind.z];
+
+    // Computing the normal and tex coord at hit position
+    const vec3 bc = payload.bc; // The barycentric coordinates of the hit point
+    const vec3 nrm  = bc.x*v0.nrm      + bc.y*v1.nrm      + bc.z*v2.nrm;
+    const vec2 uv =  bc.x*v0.texCoord + bc.y*v1.texCoord + bc.z*v2.texCoord;
+
+    // If the material has a texture, read diffuse color from it.
+    if (mat.textureId >= 0) {
+        uint txtId = objResources.txtOffset + mat.textureId;
+        mat.diffuse = texture(textureSamplers[(txtId)], uv).xyz; }
+        
+    vec3 P = payload.hitPos;  // Current hit point
+    vec3 N = normalize(nrm);  // Its normal
+    vec3 Wo = -rayD;
+    vec3 Wi = normalize(pcRay.lightPosition.xyz - payload.hitPos);
+
+    vec3 brdf = EvalBrdf(N, Wi, Wo, mat);
+    out_color  = (brdf * pcRay.lightIntensity.rgb) + 
+                 (pcRay.ambientIntensity.rgb * mat.diffuse);
+
+    imageStore(color_buffer_bg, gpos, vec4(out_color, 1.0f));
+    imageStore(color_buffer_fg, gpos, vec4(1.0f, 0.0f, 1.0f, 1.0f));
+}

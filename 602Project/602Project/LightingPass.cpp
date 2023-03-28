@@ -119,11 +119,16 @@ void LightingPass::SetupDescriptor() {
     auto device_ref = p_gfx->GetDeviceRef();
     m_descriptor.setBindings(device_ref, {
             {ScBindings::eMatrices, vk::DescriptorType::eUniformBuffer, 1,
-                vk::ShaderStageFlagBits::eVertex },
+                vk::ShaderStageFlagBits::eVertex 
+                | vk::ShaderStageFlagBits::eRaygenKHR 
+                | vk::ShaderStageFlagBits::eClosestHitKHR},
             {ScBindings::eObjDescs, vk::DescriptorType::eStorageBuffer, 1,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR},
             {ScBindings::eTextures, vk::DescriptorType::eCombinedImageSampler, texture_count,
-                vk::ShaderStageFlagBits::eFragment }
+                vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eRaygenKHR
+                | vk::ShaderStageFlagBits::eClosestHitKHR}
         });
 
     m_descriptor.write(device_ref, ScBindings::eMatrices, p_gfx->m_matrixBW.buffer);
@@ -295,6 +300,9 @@ LightingPass::LightingPass(Graphics* _p_gfx) : RenderPass(_p_gfx),
 
     m_push_consts.exposure_time = 1.0f / 144;
     m_push_consts.exposure_time = 100.0f;
+    m_push_consts.lightPosition = vec4(0.5f, 2.5f, 3.0f, 1.0f);
+    m_push_consts.lightIntensity = vec4(2.5f);
+    m_push_consts.ambientIntensity = vec4(0.2f);
     m_push_consts.window_size = p_gfx->GetWindowSize();
     m_push_consts.tile_size = TileMaxPass::tile_size;
 }
@@ -377,4 +385,12 @@ const ImageWrap& LightingPass::GetBufferRef() const {
 
 const ImageWrap& LightingPass::GetVeloDepthBufferRef() const {
     return m_velocity_buffer;
+}
+
+const DescriptorWrap& LightingPass::GetDescriptor() const {
+    return m_descriptor;
+}
+
+const PushConstantRaster& LightingPass::GetPCParams() const {
+    return m_push_consts;
 }

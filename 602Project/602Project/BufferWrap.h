@@ -7,7 +7,7 @@ struct BufferWrap
     vk::Buffer buffer;
     vk::DeviceMemory memory;
 
-    void destroy(vk::Device& device)
+    void destroy(const vk::Device& device)
     {
         device.destroyBuffer(buffer);
         device.freeMemory(memory);

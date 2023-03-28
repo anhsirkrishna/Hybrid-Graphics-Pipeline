@@ -296,6 +296,14 @@ void BufferDebugDraw::SetRaymaskBuffer(const ImageWrap& draw_buffer) {
     raymask_buffer_desc = draw_buffer.Descriptor();
 }
 
+void BufferDebugDraw::SetRaycastBGBuffer(const ImageWrap& draw_buffer) {
+    raycast_bg_buffer_desc = draw_buffer.Descriptor();
+}
+
+void BufferDebugDraw::SetRaycastFGBuffer(const ImageWrap& draw_buffer) {
+    raycast_fg_buffer_desc = draw_buffer.Descriptor();
+}
+
 void BufferDebugDraw::DrawGUI() {
     if (ImGui::BeginMenu("Draw FBOs")) {
         if (ImGui::MenuItem("Disable", "", draw_buffer == DrawBuffer::DISABLE)) {
@@ -402,6 +410,18 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::RAYMASK;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(raymask_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw RayCast BG Buffer", "", draw_buffer == DrawBuffer::RAYCAST_BG)) {
+            draw_buffer = DrawBuffer::RAYCAST_BG;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(raycast_bg_buffer_desc);
+            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
+        }
+        if (ImGui::MenuItem("Draw RayCast FG Buffer", "", draw_buffer == DrawBuffer::RAYCAST_FG)) {
+            draw_buffer = DrawBuffer::RAYCAST_FG;
+            p_gfx->DisablePostProcess();
+            SetDrawBuffer(raycast_fg_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         ImGui::EndMenu();
