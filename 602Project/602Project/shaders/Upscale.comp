@@ -8,11 +8,12 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, rgba32f) uniform image2D out_image;
-layout(set = 0, binding = 1) uniform sampler2D half_res_buffer;
-layout(set = 0, binding = 2, rgba32f) uniform image2D full_res_color_buffer;
-layout(set = 0, binding = 3, rgba32f) uniform image2D full_res_depth_buffer;
-layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
-layout(set = 0, binding = 5) uniform sampler2D raycast_bg_buffer;
+layout(set = 0, binding = 1) uniform sampler2D half_res_buffer_bg;
+layout(set = 0, binding = 2) uniform sampler2D half_res_buffer_fg;
+layout(set = 0, binding = 3, rgba32f) uniform image2D full_res_color_buffer;
+layout(set = 0, binding = 4, rgba32f) uniform image2D full_res_depth_buffer;
+layout(set = 0, binding = 5, rgba32f) uniform image2D neighbour_max_buffer;
+layout(set = 0, binding = 6) uniform sampler2D raycast_bg_buffer;
 
 layout(push_constant) uniform _pc_upsample { PushConstantUpscale pc; };
 
@@ -81,28 +82,41 @@ void main()
 
     vec4 full_res_color = imageLoad(full_res_color_buffer, gpos);
     vec2 uv = pixel_size * gpos;
-    vec4 upscaled_color = textureBicubic(half_res_buffer, uv);
+
+    //Color taken from BG and FG buffers after main DOF pass
+    vec4 upscaled_color_bg = textureBicubic(half_res_buffer_bg, uv);
+    vec4 upscaled_color_fg = textureBicubic(half_res_buffer_fg, uv);
 
     //Color taken from raycasting for accurate background reconstruction
-    vec4 upscaled_bg_color = textureBicubic(raycast_bg_buffer, uv);
+    vec4 upscaled_color_rt = textureBicubic(raycast_bg_buffer, uv);
+
+    vec4 mixed_bg_color;
+    if (pc.enable_rt_mix) {
+        vec3 mixed_color = mix(upscaled_color_rt.rgb, upscaled_color_bg.rgb, upscaled_color_bg.a);
+        mixed_bg_color = vec4(mixed_color, upscaled_color_bg.a);
+    }
+    else {
+        mixed_bg_color = upscaled_color_bg;
+    }
+    
+    int sample_count = 9 + 25 + 49; 
+    float alpha = 
+        clamp((2.0 * (1.0 / sample_count) * (upscaled_color_fg.a)), 
+               0.0f, 1.0f);
+    vec4 upscaled_color = vec4(
+        mix(mixed_bg_color.rgb/mixed_bg_color.a, upscaled_color_fg.rgb/upscaled_color_fg.a, alpha),
+        alpha);
 
     float full_res_depth = imageLoad(full_res_depth_buffer, gpos).w;
     float coc = CalculateCoCDiameter(full_res_depth);
     float bg_factor = CoCFactor(coc);
-
-    vec4 mixed_color = mix(upscaled_bg_color, upscaled_color, bg_factor);
-    mixed_color.a = upscaled_color.a;
     
     float neighbour_max_coc = imageLoad(neighbour_max_buffer, gpos/pc.tile_size).w;
     float fg_factor = CoCFactor(neighbour_max_coc);
 
     float combined_factor = mix(bg_factor, fg_factor, upscaled_color.a);
     
-    vec4 out_color;
-    if (pc.enable_rt_mix)
-        out_color = mix(mixed_color, full_res_color, combined_factor);
-    else
-        out_color = mix(upscaled_color, full_res_color, combined_factor);
+    vec4 out_color = mix(upscaled_color, full_res_color, combined_factor);
 
     imageStore(out_image, gpos, out_color);
 }

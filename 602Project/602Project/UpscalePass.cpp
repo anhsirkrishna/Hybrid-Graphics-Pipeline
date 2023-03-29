@@ -18,13 +18,13 @@ void UpscalePass::SetupDescriptor() {
          vk::ShaderStageFlagBits::eCompute},
         {1, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute},
-        {2, vk::DescriptorType::eStorageImage, 1,
+        {2, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute},
         {3, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {4, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
-        {5, vk::DescriptorType::eCombinedImageSampler, 1,
+        {5, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {6, vk::DescriptorType::eCombinedImageSampler, 1,
          vk::ShaderStageFlagBits::eCompute}
@@ -99,11 +99,13 @@ UpscalePass::~UpscalePass() {
 void UpscalePass::Setup() {
     m_descriptor.write(p_gfx->GetDeviceRef(), 0, m_buffer.Descriptor());
     m_descriptor.write(p_gfx->GetDeviceRef(), 1,
-        static_cast<MedianPass*>(p_prev_pass)->GetBuffer().Descriptor());
-    m_descriptor.write(p_gfx->GetDeviceRef(), 2, fullres_buffer_desc);
-    m_descriptor.write(p_gfx->GetDeviceRef(), 3, fullres_depth_buffer_desc);
-    m_descriptor.write(p_gfx->GetDeviceRef(), 4, neighbour_max_buffer_desc);
-    m_descriptor.write(p_gfx->GetDeviceRef(), 5, raycast_bg_buffer_desc);
+        static_cast<MedianPass*>(p_prev_pass)->GetBGBuffer().Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 2,
+        static_cast<MedianPass*>(p_prev_pass)->GetFGBuffer().Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 3, fullres_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 4, fullres_depth_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 5, neighbour_max_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 6, raycast_bg_buffer_desc);
     SetupPipeline();
 }
 
@@ -128,7 +130,7 @@ void UpscalePass::Render() {
     vk::ImageMemoryBarrier img_mem_barrier;
     img_mem_barrier.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
     img_mem_barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-    img_mem_barrier.setImage(p_median_pass->GetBuffer().GetImage());
+    img_mem_barrier.setImage(p_median_pass->GetBGBuffer().GetImage());
     img_mem_barrier.setOldLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setNewLayout(vk::ImageLayout::eGeneral);
     img_mem_barrier.setSubresourceRange(range);

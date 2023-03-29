@@ -854,13 +854,12 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetNeighbourMaxBuffer(p_neighbour_max_pass->GetBuffer());
     p_debug_buffer_pass->SetPreDOFBuffer(p_pre_dof_pass->GetBuffer());
     p_debug_buffer_pass->SetPreDOFParamsBuffer(p_pre_dof_pass->GetParamsBuffer());
-    p_debug_buffer_pass->SetDOFBGBuffer(p_dof_pass->GetBGBuffer());
-    p_debug_buffer_pass->SetDOFFGBuffer(p_dof_pass->GetFGBuffer());
     p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
-    p_debug_buffer_pass->SetMedianBuffer(p_median_pass->GetBuffer());
+    p_debug_buffer_pass->SetMedianBGBuffer(p_median_pass->GetBGBuffer());
+    p_debug_buffer_pass->SetMedianFGBuffer(p_median_pass->GetFGBuffer());
     p_debug_buffer_pass->SetUpscaledBuffer(p_upscale_pass->GetBuffer());
     p_debug_buffer_pass->SetRaymaskBuffer(p_dof_pass->GetRaymaskBuffer());
-    p_debug_buffer_pass->SetRaycastBGBuffer(p_median_pass->GetBGBuffer());
+    p_debug_buffer_pass->SetRaycastBGBuffer(p_median_pass->GetRTBuffer());
     p_debug_buffer_pass->SetEdgeBuffer(p_raymask_pass->GetBuffer());
 
 

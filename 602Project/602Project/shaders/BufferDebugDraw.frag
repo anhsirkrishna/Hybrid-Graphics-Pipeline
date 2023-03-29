@@ -109,29 +109,23 @@ void main() {
     }
     else if (pcDebugBuffer.draw_buffer == 15)
     {
-        //Draw the Median buffer
+        //Draw the Upscaled buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color;
     }
     else if (pcDebugBuffer.draw_buffer == 16)
     {
-        //Draw the Upscaled buffer
-        vec4 out_color = texture(renderedImage, uv);
-        fragColor = out_color;
-    }
-    else if (pcDebugBuffer.draw_buffer == 17)
-    {
         //Draw the Raymask buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = vec4(vec3(out_color.r), 1.0f);
     }
-    else if (pcDebugBuffer.draw_buffer == 18)
+    else if (pcDebugBuffer.draw_buffer == 17)
     {
         //Draw the RayCast bg buffer
         vec4 out_color = texture(renderedImage, uv);
         fragColor = out_color;
     }
-    else if (pcDebugBuffer.draw_buffer == 19)
+    else if (pcDebugBuffer.draw_buffer == 18)
     {
         //Draw the edge buffer
         vec4 out_color = texture(renderedImage, uv);

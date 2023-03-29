@@ -3,8 +3,9 @@
 
 class MedianPass : public RenderPass {
 private:
-	ImageWrap m_buffer;
 	ImageWrap m_bg_buffer;
+	ImageWrap m_fg_buffer;
+	ImageWrap m_rt_buffer;
 	void SetupBuffer();
 
 	DescriptorWrap m_descriptor;
@@ -25,8 +26,9 @@ public:
 
 	void DrawGUI();
 
-	const ImageWrap& GetBuffer() const;
 	const ImageWrap& GetBGBuffer() const;
+	const ImageWrap& GetFGBuffer() const;
+	const ImageWrap& GetRTBuffer() const;
 
 	void SetRaycastBGDesc(const ImageWrap& _buffer);
 };

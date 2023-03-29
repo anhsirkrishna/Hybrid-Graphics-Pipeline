@@ -91,5 +91,7 @@ void main()
     imageStore(out_image_fg, gpos, out_color_fg);
     imageStore(out_image, gpos, vec4(out_color, alpha));
     float ray_mask_depth = imageLoad(edge_buffer, gpos).g;
-    imageStore(out_image_raymask, gpos, vec4(vec3(ray_mask_val, ray_mask_depth, 0.0f), 1.0f));
+    //Prev n accumulation value from ray casting for running average
+    float prev_n = imageLoad(out_image_raymask, gpos).b;
+    imageStore(out_image_raymask, gpos, vec4(vec3(ray_mask_val, ray_mask_depth, prev_n), 1.0f));
 }

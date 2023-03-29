@@ -106,11 +106,15 @@ float SoftDepthCompare(float depth1, float depth2) {
 }
 
 void accumulateSample(vec3 first_norm, float first_depth, ivec2 loc, 
-                      float bilinearWeight, inout vec4 sum_c, inout float sum_w) {
+                      float bilinearWeight, 
+                      inout vec4 sum_c, inout float sum_w, inout float sum_hist) {
     vec4 prev_color = imageLoad(color_buffer_bg_prev, loc);
     vec4 prev_nd = imageLoad(nd_buffer_prev, loc);
     vec3 nrm = normalize(prev_nd.xyz);
     float depth = prev_nd.w;
+
+    //Using the raymask buffer to store the accumulation history
+    float prev_weight = imageLoad(raymask_buffer, loc).b;
 
     float nThreshold = 0.95f;
     float dThreshold = 0.15f;
@@ -124,6 +128,7 @@ void accumulateSample(vec3 first_norm, float first_depth, ivec2 loc,
         w = 0;
 
     sum_c += w*prev_color;
+    sum_hist += w*prev_weight;
     sum_w += w;
 }
 
@@ -249,29 +254,27 @@ void main()
         float depth_cmp_bg = SoftDepthCompare(first_depth, ray_depth);
 
         bg_weight += depth_cmp_bg;
-        //out_color_bg += depth_cmp_bg * out_color;
 
         out_color_bg += out_color;
     }
-    vec3 out_color = vec3(0.0f);
-//    if (bg_weight != 0.0f)
-//        out_color = out_color_bg/bg_weight;
-    out_color = out_color_bg / num_rays;
+    vec4 out_color = vec4(0.0f);
+    out_color = vec4(out_color_bg, bg_weight) / num_rays;
 
     vec4 screenH = (mats.priorViewProj * vec4(first_pos, 1.0)); //Project to prev buffers
     vec2 screen = ((screenH.xy/screenH.w) + vec2(1.0)) / 2.0; //H-division and map to [0,1]
     
-    vec3 old_ave;
+    vec4 old_ave;
     float old_n;
     vec4 sum_color;
     float sum_weight;
+    float sum_history;
 
     // If first… values were not defined, OR were defined but off-screen in Prev buffers:
      if (first_depth == 0.0
         || screen.x < 0 || screen.x > 1 || screen.y < 0 || screen.y > 1) {
          // Restart pixels accumulation with:
          old_n = 0;
-         old_ave = vec3(0); 
+         old_ave = vec4(0); 
      }
      else {
         // Retrieve previous accumulation value as a selectively weighted
@@ -282,42 +285,47 @@ void main()
          // Accumulate 4 numerators(weight*color) and denominators (weights only)
          sum_color = vec4(0);
          sum_weight = 0;
+         sum_history = 0;
          // Standard notation for the bilinear weights used in 4th parameter below
          float x0 = 1.0-off.x, x1 = off.x, y0 = 1.0-off.y, y1 = off.y;
          // Accumualate numerator and denominator across 4 pixels in a 2x2 pattern:
          // See last page of document for details of accumulateSample.
-         accumulateSample(first_norm, first_depth, iloc+ivec2(0,0), x0*y0, sum_color, sum_weight);
-         accumulateSample(first_norm, first_depth, iloc+ivec2(1,0), x1*y0, sum_color, sum_weight);
-         accumulateSample(first_norm, first_depth, iloc+ivec2(0,1), x0*y1, sum_color, sum_weight);
-         accumulateSample(first_norm, first_depth, iloc+ivec2(1,1), x1*y1, sum_color, sum_weight);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(0,0), x0*y0, 
+                            sum_color, sum_weight, sum_history);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(1,0), x1*y0, 
+                            sum_color, sum_weight, sum_history);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(0,1), x0*y1, 
+                            sum_color, sum_weight, sum_history);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(1,1), x1*y1, 
+                            sum_color, sum_weight, sum_history);
          // The interpolated history value is sum_color/sum_weight, then split into average and count
          // @@ Handle the denominator==0 case: Reset history with old_n=0, old_ave=(0,0,0);
          if (sum_weight == 0) {
             old_n = 0;
-            old_ave = vec3(0);
+            old_ave = vec4(0);
          }
          else {
-            vec4 history = sum_color/sum_weight;
-            old_n = history.w;
-            old_ave = history.xyz;
+            old_ave = sum_color / sum_weight;
+            old_n = sum_history / sum_weight;
          }
      }
 
      if (pc.clear == 1) {
-        old_ave = vec3(0, 0, 0);
+        old_ave = vec4(0);
         old_n = 0;
     }
 
     float new_n = old_n + 1;
-    vec3 new_ave = old_ave + (out_color - old_ave)/new_n;
+    vec4 new_ave = old_ave + (out_color - old_ave)/new_n;
 
     if (any(isnan(new_ave)))
-        new_ave = vec3(0, 0, 0);
+        new_ave = vec4(0);
     if (any(isnan(first_norm)))
-        new_ave = vec3(0, 0, 0);
+        new_ave = vec4(0);
     if ((isnan(first_depth)))
-        new_ave = vec3(0, 0, 0);
+        new_ave = vec4(0);
 
-    imageStore(color_buffer_bg, gpos, vec4(new_ave, new_n));
+    imageStore(color_buffer_bg, gpos, new_ave);
+    imageStore(raymask_buffer, gpos, vec4(ray_mask.rg, new_n, 1.0f));
     imageStore(nd_buffer, gpos, vec4(first_norm, first_depth));
 }

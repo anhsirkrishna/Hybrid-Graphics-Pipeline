@@ -272,20 +272,16 @@ void BufferDebugDraw::SetPreDOFParamsBuffer(const ImageWrap& draw_buffer) {
     pre_dof_params_buffer_desc = draw_buffer.Descriptor();
 }
 
-void BufferDebugDraw::SetDOFBGBuffer(const ImageWrap& draw_buffer) {
-    dof_bg_buffer_desc = draw_buffer.Descriptor();
-}
-
-void BufferDebugDraw::SetDOFFGBuffer(const ImageWrap& draw_buffer) {
-    dof_fg_buffer_desc = draw_buffer.Descriptor();
-}
-
 void BufferDebugDraw::SetDOFBuffer(const ImageWrap& draw_buffer) {
     dof_buffer_desc = draw_buffer.Descriptor();
 }
 
-void BufferDebugDraw::SetMedianBuffer(const ImageWrap& draw_buffer) {
-    median_buffer_desc = draw_buffer.Descriptor();
+void BufferDebugDraw::SetMedianBGBuffer(const ImageWrap& draw_buffer) {
+    median_bg_buffer_desc = draw_buffer.Descriptor();
+}
+
+void BufferDebugDraw::SetMedianFGBuffer(const ImageWrap& draw_buffer) {
+    median_fg_buffer_desc = draw_buffer.Descriptor();
 }
 
 void BufferDebugDraw::SetUpscaledBuffer(const ImageWrap& draw_buffer) {
@@ -373,13 +369,13 @@ void BufferDebugDraw::DrawGUI() {
         if (ImGui::MenuItem("Draw DOF BG Buffer", "", draw_buffer == DrawBuffer::DOF_BG)) {
             draw_buffer = DrawBuffer::DOF_BG;
             p_gfx->DisablePostProcess();
-            SetDrawBuffer(dof_bg_buffer_desc);
+            SetDrawBuffer(median_bg_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         if (ImGui::MenuItem("Draw DOF FG Buffer", "", draw_buffer == DrawBuffer::DOF_FG)) {
             draw_buffer = DrawBuffer::DOF_FG;
             p_gfx->DisablePostProcess();
-            SetDrawBuffer(dof_fg_buffer_desc);
+            SetDrawBuffer(median_fg_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         if (ImGui::MenuItem("Draw DOF Buffer", "", draw_buffer == DrawBuffer::DOF)) {
@@ -392,12 +388,6 @@ void BufferDebugDraw::DrawGUI() {
             draw_buffer = DrawBuffer::DOF_ALPHA;
             p_gfx->DisablePostProcess();
             SetDrawBuffer(dof_buffer_desc);
-            m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
-        }
-        if (ImGui::MenuItem("Draw Median Buffer", "", draw_buffer == DrawBuffer::MEDIAN)) {
-            draw_buffer = DrawBuffer::MEDIAN;
-            p_gfx->DisablePostProcess();
-            SetDrawBuffer(median_buffer_desc);
             m_push_consts.draw_buffer = static_cast<int>(draw_buffer);
         }
         if (ImGui::MenuItem("Draw Upscaled Buffer", "", draw_buffer == DrawBuffer::UPSCALED)) {

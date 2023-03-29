@@ -6,11 +6,14 @@
 #include "DOFPass.h"
 
 void MedianPass::SetupBuffer() {
-	m_buffer.CreateTextureSampler();
-	m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
-
     m_bg_buffer.CreateTextureSampler();
     m_bg_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_fg_buffer.CreateTextureSampler();
+    m_fg_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_rt_buffer.CreateTextureSampler();
+    m_rt_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void MedianPass::SetupDescriptor() {
@@ -22,6 +25,10 @@ void MedianPass::SetupDescriptor() {
         {2, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {3, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {4, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {5, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute}
         });
 }
@@ -59,7 +66,7 @@ void MedianPass::SetupPipeline() {
 }
 
 MedianPass::MedianPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx, _p_prev_pass),
-    m_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+    m_bg_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
         vk::Format::eR32G32B32A32Sfloat,
         vk::ImageUsageFlagBits::eTransferDst |
         vk::ImageUsageFlagBits::eSampled |
@@ -69,7 +76,17 @@ MedianPass::MedianPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         1, p_gfx),
-    m_bg_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+    m_fg_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
+    m_rt_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
         vk::Format::eR32G32B32A32Sfloat,
         vk::ImageUsageFlagBits::eTransferDst |
         vk::ImageUsageFlagBits::eSampled |
@@ -88,16 +105,20 @@ MedianPass::~MedianPass() {
     p_gfx->GetDeviceRef().destroyPipeline(m_pipeline);
 
     m_descriptor.destroy(p_gfx->GetDeviceRef());
-    m_buffer.destroy(p_gfx->GetDeviceRef());
     m_bg_buffer.destroy(p_gfx->GetDeviceRef());
+    m_fg_buffer.destroy(p_gfx->GetDeviceRef());
+    m_rt_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void MedianPass::Setup() {
     m_descriptor.write(p_gfx->GetDeviceRef(), 0,
-        static_cast<DOFPass*>(p_prev_pass)->GetBuffer().Descriptor());
-    m_descriptor.write(p_gfx->GetDeviceRef(), 1, m_buffer.Descriptor());
-    m_descriptor.write(p_gfx->GetDeviceRef(), 2, rt_bg_desc);
-    m_descriptor.write(p_gfx->GetDeviceRef(), 3, m_bg_buffer.Descriptor());
+        static_cast<DOFPass*>(p_prev_pass)->GetBGBuffer().Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 1,
+        static_cast<DOFPass*>(p_prev_pass)->GetFGBuffer().Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 2, m_bg_buffer.Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 3, m_fg_buffer.Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 4, rt_bg_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 5, m_rt_buffer.Descriptor());
     SetupPipeline();
 }
 
@@ -136,7 +157,21 @@ void MedianPass::Render() {
         (p_gfx->GetWindowSize().x / 2),
         (p_gfx->GetWindowSize().y / 2), 1);
 
-    img_mem_barrier.setImage(m_buffer.GetImage());
+    img_mem_barrier.setImage(m_bg_buffer.GetImage());
+    p_gfx->GetCommandBuffer().pipelineBarrier(
+        vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::DependencyFlagBits::eDeviceGroup,
+        0, nullptr, 0, nullptr, 1, &img_mem_barrier);
+
+    img_mem_barrier.setImage(m_fg_buffer.GetImage());
+    p_gfx->GetCommandBuffer().pipelineBarrier(
+        vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::DependencyFlagBits::eDeviceGroup,
+        0, nullptr, 0, nullptr, 1, &img_mem_barrier);
+
+    img_mem_barrier.setImage(m_rt_buffer.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(
         vk::PipelineStageFlagBits::eComputeShader,
         vk::PipelineStageFlagBits::eFragmentShader,
@@ -152,12 +187,16 @@ void MedianPass::DrawGUI()
 {
 }
 
-const ImageWrap& MedianPass::GetBuffer() const {
-    return m_buffer;
-}
-
 const ImageWrap& MedianPass::GetBGBuffer() const {
     return m_bg_buffer;
+}
+
+const ImageWrap& MedianPass::GetFGBuffer() const {
+    return m_fg_buffer;
+}
+
+const ImageWrap& MedianPass::GetRTBuffer() const {
+    return m_rt_buffer;
 }
 
 void MedianPass::SetRaycastBGDesc(const ImageWrap& _buffer) {

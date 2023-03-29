@@ -54,5 +54,9 @@ void main()
         }
     }
     float blurred_xn = convoluteMatrices(G_KERNEL, imgMat);
-    imageStore(out_image, gpos, vec4(blurred_xn, depth, 0.0f, 1.0f));
+
+    //Prev N for accumulation average used in ray casting
+    float prev_n = imageLoad(out_image, gpos).z;
+
+    imageStore(out_image, gpos, vec4(blurred_xn, depth, prev_n, 1.0f));
 }

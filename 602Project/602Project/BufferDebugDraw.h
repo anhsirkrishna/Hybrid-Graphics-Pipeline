@@ -22,7 +22,6 @@ public:
 		DOF_FG,
 		DOF,
 		DOF_ALPHA,
-		MEDIAN,
 		UPSCALED,
 		EDGE,
 		RAYCAST_BG,
@@ -35,10 +34,9 @@ private:
 	vk::DescriptorImageInfo neighbour_max_buffer_desc;
 	vk::DescriptorImageInfo pre_dof_buffer_desc;
 	vk::DescriptorImageInfo pre_dof_params_buffer_desc;
-	vk::DescriptorImageInfo dof_bg_buffer_desc;
-	vk::DescriptorImageInfo dof_fg_buffer_desc;
+	vk::DescriptorImageInfo median_bg_buffer_desc;
+	vk::DescriptorImageInfo median_fg_buffer_desc;
 	vk::DescriptorImageInfo dof_buffer_desc;
-	vk::DescriptorImageInfo median_buffer_desc;
 	vk::DescriptorImageInfo upscaled_buffer_desc;
 	vk::DescriptorImageInfo edge_buffer_desc;
 	vk::DescriptorImageInfo raycast_bg_buffer_desc;
@@ -75,10 +73,9 @@ public:
 	void SetNeighbourMaxBuffer(const ImageWrap& draw_buffer);
 	void SetPreDOFBuffer(const ImageWrap& draw_buffer);
 	void SetPreDOFParamsBuffer(const ImageWrap& draw_buffer);
-	void SetDOFBGBuffer(const ImageWrap& draw_buffer);
-	void SetDOFFGBuffer(const ImageWrap& draw_buffer);
 	void SetDOFBuffer(const ImageWrap& draw_buffer);
-	void SetMedianBuffer(const ImageWrap& draw_buffer);
+	void SetMedianBGBuffer(const ImageWrap& draw_buffer);
+	void SetMedianFGBuffer(const ImageWrap& draw_buffer);
 	void SetUpscaledBuffer(const ImageWrap& draw_buffer);
 	void SetRaymaskBuffer(const ImageWrap& draw_buffer);
 	void SetRaycastBGBuffer(const ImageWrap& draw_buffer);
