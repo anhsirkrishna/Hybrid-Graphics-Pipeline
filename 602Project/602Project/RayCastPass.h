@@ -3,12 +3,15 @@
 #include "AccelerationWrap.h"
 
 class LightingPass;
+class DOFPass;
 
 class RayCastPass : public RenderPass
 {
 private:
     ImageWrap m_buffer_bg;
-    ImageWrap m_buffer_fg;
+    ImageWrap m_buffer_bg_prev;
+    ImageWrap m_buffer_nd;
+    ImageWrap m_buffer_nd_prev;
     vk::DescriptorImageInfo raymask_buffer_desc;
     void SetupBuffer();
 
@@ -35,6 +38,7 @@ private:
     void CreateRtShaderBindingTable();
 
     LightingPass* p_lighting_pass;
+    DOFPass* p_dof_pass;
 
     bool enabled;
 public:
@@ -48,8 +52,8 @@ public:
     void DrawGUI() override;
 
     void SetLightingPass(LightingPass* _p_lighting_pass);
+    void SetDOFPass(DOFPass* _p_lighting_pass);
 
     const ImageWrap& GetBGBuffer() const;
-    const ImageWrap& GetFGBuffer() const;
 };
 

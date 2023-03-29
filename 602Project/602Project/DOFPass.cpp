@@ -16,6 +16,9 @@ void DOFPass::SetupBuffer() {
 
     m_buffer.CreateTextureSampler();
     m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_raymask_buffer.CreateTextureSampler();
+    m_raymask_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void DOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo img_desc_info) {
@@ -24,6 +27,10 @@ void DOFPass::WriteToDescriptor(glm::uint index, const vk::DescriptorImageInfo i
 
 void DOFPass::SetNeighbourMaxBufferDesc(const ImageWrap& buffer) {
     neighbour_max_buffer_desc = buffer.Descriptor();
+}
+
+void DOFPass::SetEdgeBufferDesc(const ImageWrap& buffer) {
+    edge_buffer_desc = buffer.Descriptor();
 }
 
 const PushConstantDoF& DOFPass::GetDOFParams() {
@@ -40,6 +47,10 @@ const ImageWrap& DOFPass::GetFGBuffer() const {
 
 const ImageWrap& DOFPass::GetBuffer() const {
     return m_buffer;
+}
+
+const ImageWrap& DOFPass::GetRaymaskBuffer() const {
+    return m_raymask_buffer;
 }
 
 void DOFPass::DrawGUI() {
@@ -83,6 +94,10 @@ void DOFPass::SetupDescriptor() {
         {4, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {5, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {6, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {7, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute} });
 }
 
@@ -149,6 +164,16 @@ DOFPass::DOFPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         1, p_gfx),
+    m_raymask_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
     m_push_consts(), enabled(true) {
     m_push_consts.lens_diameter = 0.035f;
     m_push_consts.focal_length = 0.05f;
@@ -169,6 +194,7 @@ DOFPass::~DOFPass() {
     m_buffer_bg.destroy(p_gfx->GetDeviceRef());
     m_buffer_fg.destroy(p_gfx->GetDeviceRef());
     m_buffer.destroy(p_gfx->GetDeviceRef());
+    m_raymask_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void DOFPass::Setup() {
@@ -180,6 +206,8 @@ void DOFPass::Setup() {
         static_cast<PreDOFPass*>(p_prev_pass)->GetParamsBuffer().Descriptor());
     WriteToDescriptor(4, neighbour_max_buffer_desc);
     WriteToDescriptor(5, m_buffer.Descriptor());
+    WriteToDescriptor(6, m_raymask_buffer.Descriptor());
+    WriteToDescriptor(7, edge_buffer_desc);
     SetupPipeline();
 }
 

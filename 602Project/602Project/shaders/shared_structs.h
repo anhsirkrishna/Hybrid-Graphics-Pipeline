@@ -85,8 +85,14 @@ struct PushConstantRay
 	vec4 lightPosition;
 	vec4 lightIntensity;
 	vec4 ambientIntensity;
+	float focal_length;
+	float focal_distance;
+	float lens_diameter;
+	float coc_sample_scale;
+	float soft_z_extent;
 	uint frameSeed;
 	int ray_count_factor;
+	int clear;
 	int alignmentTest;
 };
 
@@ -143,6 +149,18 @@ struct PushConstantDoF
   float coc_sample_scale;
   int tile_size;
   int alignmentTest;
+};
+
+struct PushConstantUpscale
+{
+	float focal_length;
+	float focal_distance;
+	float lens_diameter;
+	float soft_z_extent;
+	float coc_sample_scale;
+	bool enable_rt_mix;
+	int tile_size;
+	int alignmentTest;
 };
 
 // Push constant structure for the Tile Max pass

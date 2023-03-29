@@ -188,6 +188,7 @@ void RaytracingBuilderKHR::BuildTlas(const std::vector<vk::AccelerationStructure
     // Finalizing and destroying temporary data
     p_gfx->SubmitTempCommandBuffer(cmdBuf);
     instancesBuffer.destroy(p_gfx->GetDeviceRef());
+    scratch_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void RaytracingBuilderKHR::CmdCreateBlas(vk::CommandBuffer cmdBuf, std::vector<uint32_t> indices, std::vector<BuildAccelerationStructure>& buildAs, vk::DeviceAddress scratchAddress, vk::QueryPool queryPool) {
@@ -303,7 +304,7 @@ void RaytracingBuilderKHR::CmdCreateTlas(vk::CommandBuffer cmdBuf, uint32_t coun
     }
 
     // Allocate the scratch memory
-    BufferWrap scratch_buffer = p_gfx->CreateBufferWrap(sizeInfo.buildScratchSize,
+    scratch_buffer = p_gfx->CreateBufferWrap(sizeInfo.buildScratchSize,
         vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer,
         vk::MemoryPropertyFlagBits::eDeviceLocal);
 
@@ -322,5 +323,4 @@ void RaytracingBuilderKHR::CmdCreateTlas(vk::CommandBuffer cmdBuf, uint32_t coun
 
     // Build the TLAS
     cmdBuf.buildAccelerationStructuresKHR(1, &buildInfo, &pBuildOffsetInfo);
-    //scratch_buffer.destroy(p_gfx->GetDeviceRef());
 }

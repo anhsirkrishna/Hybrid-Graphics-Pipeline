@@ -2,14 +2,54 @@
 #define DOF_SINGLE_PIXEL_RADIUS 0.7071
 
 //The following equation is from Potmesil 1981
-float CaclulateCoCDiameter(float depth) {
+float CalculateCoCDiameter(float depth) {
     float Cr = ((pc.lens_diameter * pc.focal_length) / (pc.focal_distance - pc.focal_length)) *
         (abs(depth - pc.focal_distance) / depth);
-    return min(Cr * pc.coc_sample_scale, pc.tile_size);
+    return Cr * pc.coc_sample_scale;
 }
 
 //The following function is from Jiminez 2014
 float SampleAlpha(float sample_coc) {
     return min(1.0f / (PI * sample_coc * sample_coc),
         1.0f / (PI * DOF_SINGLE_PIXEL_RADIUS * DOF_SINGLE_PIXEL_RADIUS));
+}
+
+//The following function is from Shirley 1997
+vec2 ToUnitDisk(vec2 onSquare) {
+    float phi, r, u, v;
+    float a = 2 * onSquare.x - 1;
+    float b = 2 * onSquare.y - 1;
+
+    if (a > -b) 
+    {
+        if (a > b)
+        {
+            r = a;
+            phi = (PI/4) * (b/a);
+        }
+        else
+        {
+            r = b;
+            phi = (PI/4) * (2 - (a/b));
+        }
+    }
+    else
+    {
+        if (a < b)
+        {
+            r = -a;
+            phi = (PI/4) * (4 + (b/a));
+        }
+        else
+        {
+            r = -b;
+            if (b != 0)
+                phi = (PI/4) * (6 - (a/b));
+            else
+                phi = 0;
+        }
+    }
+    u = r * cos(phi);
+    v = r * sin(phi);
+    return vec2(u,v);
 }

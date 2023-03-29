@@ -15,11 +15,12 @@ private:
 	vk::Pipeline m_pipeline;
 	void SetupPipeline();
 
-	PushConstantDoF m_push_consts;
+	PushConstantUpscale m_push_consts;
 
 	vk::DescriptorImageInfo neighbour_max_buffer_desc;
 	vk::DescriptorImageInfo fullres_buffer_desc;
 	vk::DescriptorImageInfo fullres_depth_buffer_desc;
+	vk::DescriptorImageInfo raycast_bg_buffer_desc;
 
 	DOFPass* p_dof_pass;
 
@@ -39,6 +40,7 @@ public:
 	void SetFullResBufferDesc(const ImageWrap& _buffer);
 	void SetFullResDepthBufferDesc(const ImageWrap& _buffer);
 	void SetNeighbourBufferDesc(const ImageWrap& _buffer);
+	void SetRaycastBGBufferDesc(const ImageWrap& _buffer);
 
 	void SetDOFPass(DOFPass* _p_dof_pass);
 };

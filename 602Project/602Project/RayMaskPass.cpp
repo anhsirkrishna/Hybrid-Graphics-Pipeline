@@ -124,10 +124,12 @@ void RayMaskPass::Render() {
         sizeof(PushConstantRaymask), & m_push_consts);
 
     // This MUST match the shaders's line:
-    //    layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+    //    layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
+    int group_size = 32;
     p_gfx->GetCommandBuffer().dispatch(
-        (p_gfx->GetWindowSize().x / 2),
-        (p_gfx->GetWindowSize().y / 2), 1);
+        (p_gfx->GetWindowSize().x / 2) / 32,
+        (p_gfx->GetWindowSize().y / 2) / 32,
+        1);
 
     img_mem_barrier.setImage(m_buffer.GetImage());
     p_gfx->GetCommandBuffer().pipelineBarrier(

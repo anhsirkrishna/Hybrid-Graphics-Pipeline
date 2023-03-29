@@ -16,50 +16,12 @@ layout(set = 0, binding = 2, rgba32f) uniform image2D color_depth_buffer;
 layout(set = 0, binding = 3, rgba32f) uniform image2D pre_params_buffer;
 layout(set = 0, binding = 4, rgba32f) uniform image2D neighbour_max_buffer;
 layout(set = 0, binding = 5, rgba32f) uniform image2D out_image;
+layout(set = 0, binding = 6, rgba32f) uniform image2D out_image_raymask;
+layout(set = 0, binding = 7, rgba32f) uniform image2D edge_buffer;
 
 layout(push_constant) uniform _pc_DOF { PushConstantDoF pc; };
 
 #include "util"
-
-//The following function is from Shirley 1997
-vec2 ToUnitDisk(vec2 onSquare) {
-    float phi, r, u, v;
-    float a = 2 * onSquare.x - 1;
-    float b = 2 * onSquare.y - 1;
-
-    if (a > -b) 
-    {
-        if (a > b)
-        {
-            r = a;
-            phi = (PI/4) * (b/a);
-        }
-        else
-        {
-            r = b;
-            phi = (PI/4) * (2 - (a/b));
-        }
-    }
-    else
-    {
-        if (a < b)
-        {
-            r = -a;
-            phi = (PI/4) * (4 + (b/a));
-        }
-        else
-        {
-            r = -b;
-            if (b != 0)
-                phi = (PI/4) * (6 - (a/b));
-            else
-                phi = 0;
-        }
-    }
-    u = r * cos(phi);
-    v = r * sin(phi);
-    return vec2(u,v);
-}
 
 float SpreadCompare(vec2 X, vec2 Y, float coc_radius) {
     return clamp(1 - length(X-Y)/coc_radius, 0, 1);
@@ -81,6 +43,7 @@ void main()
 
     vec4 out_color_bg = vec4(0.0f);
     vec4 out_color_fg = vec4(0.0f);
+    float ray_mask_val = 0.0f;
     int sample_count = 0;
     for (int i=1; i <=max_rings ; ++i ) {
         int taps = i*8;
@@ -113,6 +76,9 @@ void main()
                 out_color_bg += (bg * vec4(sample_color, 1.0));
                 out_color_fg += (fg * vec4(sample_color, 1.0));
                 sample_count++;
+
+                //Raymask generation
+                ray_mask_val = max(ray_mask_val, imageLoad(edge_buffer, load_pos).r);
             }
         }
     }
@@ -124,4 +90,6 @@ void main()
     imageStore(out_image_bg, gpos, out_color_bg);
     imageStore(out_image_fg, gpos, out_color_fg);
     imageStore(out_image, gpos, vec4(out_color, alpha));
+    float ray_mask_depth = imageLoad(edge_buffer, gpos).g;
+    imageStore(out_image_raymask, gpos, vec4(vec3(ray_mask_val, ray_mask_depth, 0.0f), 1.0f));
 }

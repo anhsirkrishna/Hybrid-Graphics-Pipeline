@@ -4,6 +4,7 @@
 class MedianPass : public RenderPass {
 private:
 	ImageWrap m_buffer;
+	ImageWrap m_bg_buffer;
 	void SetupBuffer();
 
 	DescriptorWrap m_descriptor;
@@ -12,6 +13,8 @@ private:
 	vk::PipelineLayout m_pipeline_layout;
 	vk::Pipeline m_pipeline;
 	void SetupPipeline();
+
+	vk::DescriptorImageInfo rt_bg_desc;
 public:
 	MedianPass(Graphics* _p_gfx, RenderPass* p_prev_pass = nullptr);
 	~MedianPass();
@@ -23,5 +26,8 @@ public:
 	void DrawGUI();
 
 	const ImageWrap& GetBuffer() const;
+	const ImageWrap& GetBGBuffer() const;
+
+	void SetRaycastBGDesc(const ImageWrap& _buffer);
 };
 

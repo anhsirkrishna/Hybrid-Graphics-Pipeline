@@ -22,6 +22,7 @@ public:
     void SetEyePos(glm::vec3 _eye_pos);
     void SetSpin(float _spin);
     void SetTilt(float _tilt);
+    bool WasUpdated() const;
 private:
     float ry;
     float front;

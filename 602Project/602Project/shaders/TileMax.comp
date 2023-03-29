@@ -33,7 +33,7 @@ void main()
             it_load_pos = max(ivec2(0), it_load_pos);
             vel_depth = imageLoad(vel_depth_buffer, it_load_pos);
             min_depth = min(min_depth, vel_depth.w);
-            max_coc = max(max_coc, CaclulateCoCDiameter(vel_depth.w));
+            max_coc = max(max_coc, CalculateCoCDiameter(vel_depth.w));
             if (length(max_velo) < length(vel_depth.rg)) {
                 max_velo = vel_depth.rg;
             }

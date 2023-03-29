@@ -5,6 +5,8 @@
 #include "RayCastPass.h"
 #include "RayMaskPass.h"
 #include "LightingPass.h"
+#include "DOFPass.h"
+#include "Camera.h"
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -61,8 +63,12 @@ BlasInput ObjectToVkGeometryKHR(const ObjData& model, const vk::Device& device) 
 void RayCastPass::SetupBuffer() {
     m_buffer_bg.CreateTextureSampler();
     m_buffer_bg.TransitionImageLayout(vk::ImageLayout::eGeneral);
-    m_buffer_fg.CreateTextureSampler();
-    m_buffer_fg.TransitionImageLayout(vk::ImageLayout::eGeneral);
+    m_buffer_bg_prev.CreateTextureSampler();
+    m_buffer_bg_prev.TransitionImageLayout(vk::ImageLayout::eGeneral);
+    m_buffer_nd.CreateTextureSampler();
+    m_buffer_nd.TransitionImageLayout(vk::ImageLayout::eGeneral);
+    m_buffer_nd_prev.CreateTextureSampler();
+    m_buffer_nd_prev.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void RayCastPass::CreateRaytraceAS() {
@@ -106,6 +112,10 @@ void RayCastPass::SetupDescriptor() {
         {2, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eRaygenKHR}, 
         {3, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {4, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {5, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eRaygenKHR}
         });
 }
@@ -327,7 +337,7 @@ RayCastPass::RayCastPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         1, p_gfx),
-    m_buffer_fg(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+    m_buffer_bg_prev(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
         vk::Format::eR32G32B32A32Sfloat,
         vk::ImageUsageFlagBits::eTransferDst |
         vk::ImageUsageFlagBits::eSampled |
@@ -337,9 +347,30 @@ RayCastPass::RayCastPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) :
         vk::ImageAspectFlagBits::eColor,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         1, p_gfx),
-    m_rt_builder(_p_gfx), enabled(false) {
+    m_buffer_nd(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
+    m_buffer_nd_prev(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
+    m_rt_builder(_p_gfx), enabled(true) {
 
     m_push_consts.ray_count_factor = 10;
+    m_push_consts.clear = 0;
 
     CreateRaytraceAS();
     SetupBuffer();
@@ -350,20 +381,24 @@ RayCastPass::~RayCastPass() {
     p_gfx->GetDeviceRef().destroyPipelineLayout(m_pipeline_layout);
     p_gfx->GetDeviceRef().destroyPipeline(m_pipeline);
     m_descriptor.destroy(p_gfx->GetDeviceRef());
-
+    
     m_buffer_bg.destroy(p_gfx->GetDeviceRef());
-    m_buffer_fg.destroy(p_gfx->GetDeviceRef());
+    m_buffer_bg_prev.destroy(p_gfx->GetDeviceRef());
+    m_buffer_nd.destroy(p_gfx->GetDeviceRef());
+    m_buffer_nd_prev.destroy(p_gfx->GetDeviceRef());
     m_shaderBindingTableBW.destroy(p_gfx->GetDeviceRef());
 }
  
 void RayCastPass::Setup(){
-    raymask_buffer_desc = static_cast<RayMaskPass*>(p_prev_pass)->GetBuffer().Descriptor();
+    raymask_buffer_desc = static_cast<DOFPass*>(p_dof_pass)->GetRaymaskBuffer().Descriptor();
 
     auto device = p_gfx->GetDeviceRef();
     m_descriptor.write(device, 0, m_rt_builder.GetAccelerationStructure());
     m_descriptor.write(device, 1, m_buffer_bg.Descriptor());
-    m_descriptor.write(device, 2, m_buffer_fg.Descriptor());
+    m_descriptor.write(device, 2, m_buffer_bg_prev.Descriptor());
     m_descriptor.write(device, 3, raymask_buffer_desc);
+    m_descriptor.write(device, 4, m_buffer_nd.Descriptor());
+    m_descriptor.write(device, 5, m_buffer_nd_prev.Descriptor());
 
     lighting_pass_desc_layout = p_lighting_pass->GetDescriptor().descSetLayout;
     lighting_pass_desc_set = p_lighting_pass->GetDescriptor().descSet;
@@ -376,12 +411,21 @@ void RayCastPass::Render() {
     if (not enabled)
         return;
 
+    if (p_gfx->GetCamera()->WasUpdated())
+        m_push_consts.clear = true;
+
     // The push constants for the ray tracing pipeline.
     m_push_consts.alignmentTest = 1234;
 
     m_push_consts.lightPosition = p_lighting_pass->GetPCParams().lightPosition;
     m_push_consts.lightIntensity = p_lighting_pass->GetPCParams().lightIntensity;
     m_push_consts.ambientIntensity = p_lighting_pass->GetPCParams().ambientIntensity;
+
+    m_push_consts.focal_distance = p_dof_pass->GetDOFParams().focal_distance;
+    m_push_consts.focal_length = p_dof_pass->GetDOFParams().focal_length;
+    m_push_consts.lens_diameter = p_dof_pass->GetDOFParams().lens_diameter;
+    m_push_consts.coc_sample_scale = p_dof_pass->GetDOFParams().coc_sample_scale;
+    m_push_consts.soft_z_extent = p_dof_pass->GetDOFParams().soft_z_extent;
 
     m_push_consts.frameSeed = rand() % 32768;
 
@@ -404,6 +448,11 @@ void RayCastPass::Render() {
     cmd_buff.traceRaysKHR(
         &m_rgen_region, &m_miss_region, &m_hit_region, &m_call_region, 
         p_gfx->GetWindowExtent().width/2, p_gfx->GetWindowExtent().height/2, 1);
+
+    p_gfx->CommandCopyImage(m_buffer_bg, m_buffer_bg_prev);
+    p_gfx->CommandCopyImage(m_buffer_nd, m_buffer_nd_prev);
+
+    m_push_consts.clear = 0;
 }
 
 void RayCastPass::Teardown() {
@@ -412,15 +461,20 @@ void RayCastPass::Teardown() {
 
 void RayCastPass::DrawGUI() {
     ImGui::Checkbox("Raycast enabled", &enabled);
+    ImGui::SliderInt("Raycast count factor", &m_push_consts.ray_count_factor, 1, 50);
+
+    if (ImGui::Button("Reset accumulation"))
+        m_push_consts.clear = 1;
 }
 
 void RayCastPass::SetLightingPass(LightingPass* _p_lighting_pass) {
     p_lighting_pass = _p_lighting_pass;
 }
 
+void RayCastPass::SetDOFPass(DOFPass* _p_dof_pass) {
+    p_dof_pass = _p_dof_pass;
+}
+
 const ImageWrap& RayCastPass::GetBGBuffer() const {
     return m_buffer_bg;
-}
-const ImageWrap& RayCastPass::GetFGBuffer() const {
-    return m_buffer_fg;
 }

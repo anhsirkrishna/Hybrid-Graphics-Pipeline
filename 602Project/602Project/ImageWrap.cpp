@@ -201,3 +201,7 @@ vk::ImageView ImageWrap::GetImageView() const {
 const vk::Format& ImageWrap::GetFormat() const {
     return image_format;
 }
+
+vk::Extent2D ImageWrap::GetImageSize() const {
+    return image_size;
+}

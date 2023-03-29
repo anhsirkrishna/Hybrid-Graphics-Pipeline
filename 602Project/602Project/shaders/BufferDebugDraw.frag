@@ -123,7 +123,7 @@ void main() {
     {
         //Draw the Raymask buffer
         vec4 out_color = texture(renderedImage, uv);
-        fragColor = out_color;
+        fragColor = vec4(vec3(out_color.r), 1.0f);
     }
     else if (pcDebugBuffer.draw_buffer == 18)
     {
@@ -133,8 +133,8 @@ void main() {
     }
     else if (pcDebugBuffer.draw_buffer == 19)
     {
-        //Draw the RayCast fg buffer
+        //Draw the edge buffer
         vec4 out_color = texture(renderedImage, uv);
-        fragColor = out_color;
+        fragColor = vec4(vec3(out_color.r), 1.0f);
     }
 }

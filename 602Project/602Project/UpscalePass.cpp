@@ -23,14 +23,19 @@ void UpscalePass::SetupDescriptor() {
         {3, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {4, vk::DescriptorType::eStorageImage, 1,
-         vk::ShaderStageFlagBits::eCompute} });
+         vk::ShaderStageFlagBits::eCompute},
+        {5, vk::DescriptorType::eCombinedImageSampler, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {6, vk::DescriptorType::eCombinedImageSampler, 1,
+         vk::ShaderStageFlagBits::eCompute}
+        });
 }
 
 void UpscalePass::SetupPipeline() {
     vk::PushConstantRange pc_info;
     pc_info.setStageFlags(vk::ShaderStageFlagBits::eCompute);
     pc_info.setOffset(0);
-    pc_info.setSize(sizeof(PushConstantDoF));
+    pc_info.setSize(sizeof(PushConstantUpscale));
 
     vk::PipelineLayoutCreateInfo pl_create_info;
     pl_create_info.setSetLayoutCount(1);
@@ -76,6 +81,7 @@ m_buffer(p_gfx->GetWindowSize().x, p_gfx->GetWindowSize().y,
     m_push_consts.coc_sample_scale = 800.0f;
     m_push_consts.soft_z_extent = 0.35f;
     m_push_consts.tile_size = TileMaxPass::tile_size;
+    m_push_consts.enable_rt_mix = true;
     m_push_consts.alignmentTest = 1234;
 
     SetupBuffer();
@@ -97,6 +103,7 @@ void UpscalePass::Setup() {
     m_descriptor.write(p_gfx->GetDeviceRef(), 2, fullres_buffer_desc);
     m_descriptor.write(p_gfx->GetDeviceRef(), 3, fullres_depth_buffer_desc);
     m_descriptor.write(p_gfx->GetDeviceRef(), 4, neighbour_max_buffer_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 5, raycast_bg_buffer_desc);
     SetupPipeline();
 }
 
@@ -141,7 +148,7 @@ void UpscalePass::Render() {
         &m_descriptor.descSet, 0, nullptr);
     p_gfx->GetCommandBuffer().pushConstants(m_pipeline_layout,
         vk::ShaderStageFlagBits::eCompute, 0,
-        sizeof(PushConstantDoF),
+        sizeof(PushConstantUpscale),
         &m_push_consts);
 
     p_gfx->GetCommandBuffer().dispatch(
@@ -160,8 +167,8 @@ void UpscalePass::Teardown()
 {
 }
 
-void UpscalePass::DrawGUI()
-{
+void UpscalePass::DrawGUI() {
+    ImGui::Checkbox("Enable RT mixing", &m_push_consts.enable_rt_mix);
 }
 
 const ImageWrap& UpscalePass::GetBuffer() const {
@@ -178,6 +185,10 @@ void UpscalePass::SetFullResDepthBufferDesc(const ImageWrap& _buffer) {
 
 void UpscalePass::SetNeighbourBufferDesc(const ImageWrap& _buffer) {
     neighbour_max_buffer_desc = _buffer.Descriptor();
+}
+
+void UpscalePass::SetRaycastBGBufferDesc(const ImageWrap& _buffer) {
+    raycast_bg_buffer_desc = _buffer.Descriptor();
 }
 
 void UpscalePass::SetDOFPass(DOFPass* _p_dof_pass) {

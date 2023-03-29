@@ -807,17 +807,30 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
         std::make_unique<PreDOFPass>(this, p_lighting_pass.get());
     p_pre_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
 
+    //Add a raymask pass to the list of passes
+    std::unique_ptr<RayMaskPass> p_raymask_pass =
+        std::make_unique<RayMaskPass>(this, p_pre_dof_pass.get());
+
     //Add the depth of field pass to the list of passes.
     std::unique_ptr<DOFPass> p_dof_pass = std::make_unique<DOFPass>(this, p_pre_dof_pass.get());
     p_dof_pass->SetNeighbourMaxBufferDesc(p_neighbour_max_pass->GetBuffer());
+    p_dof_pass->SetEdgeBufferDesc(p_raymask_pass->GetBuffer());
+
     //Make sure TileMaxPass can access DOFPass for the DOF parameters
     p_tile_max_pass->SetDOFPass(p_dof_pass.get());
     //Make sure PreDOFPass can access DOFPass for the DOF parameters
     p_pre_dof_pass->SetDOFPass(p_dof_pass.get());
 
+    //Add the Raycast pass to the list of passes
+    std::unique_ptr<RayCastPass> p_raycast_pass =
+        std::make_unique<RayCastPass>(this, p_raymask_pass.get());
+    p_raycast_pass->SetLightingPass(p_lighting_pass.get());
+    p_raycast_pass->SetDOFPass(p_dof_pass.get());
+
     //Add the median pass to the list of passes.
     std::unique_ptr<MedianPass> p_median_pass =
         std::make_unique<MedianPass>(this, p_dof_pass.get());
+    p_median_pass->SetRaycastBGDesc(p_raycast_pass->GetBGBuffer());
 
     //Add the upscale pass to the list of passes
     std::unique_ptr<UpscalePass> p_upscale_pass = 
@@ -826,19 +839,11 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_upscale_pass->SetFullResDepthBufferDesc(p_lighting_pass->GetVeloDepthBufferRef());
     p_upscale_pass->SetNeighbourBufferDesc(p_neighbour_max_pass->GetBuffer());
     p_upscale_pass->SetDOFPass(p_dof_pass.get());
-
-    //Add a raymask pass to the list of passes
-    std::unique_ptr<RayMaskPass> p_raymask_pass =
-        std::make_unique<RayMaskPass>(this, p_pre_dof_pass.get());
+    p_upscale_pass->SetRaycastBGBufferDesc(p_median_pass->GetBGBuffer());
 
     //Add the MBlur pass to the list of passes.
     std::unique_ptr<MBlurPass> p_mblur_pass = std::make_unique<MBlurPass>(this, p_lighting_pass.get());
     p_mblur_pass->SetNeighbourMaxDesc(p_neighbour_max_pass->GetBuffer());
-
-    //Add the Raycast pass to the list of passes
-    std::unique_ptr<RayCastPass> p_raycast_pass = 
-        std::make_unique<RayCastPass>(this, p_raymask_pass.get());
-    p_raycast_pass->SetLightingPass(p_lighting_pass.get());
 
     //Add the debug buffer draw pass to the list of passes.
     std::unique_ptr<BufferDebugDraw> p_debug_buffer_pass = 
@@ -854,21 +859,21 @@ Graphics::Graphics(Window* _p_parent_window, bool api_dump) :
     p_debug_buffer_pass->SetDOFBuffer(p_dof_pass->GetBuffer());
     p_debug_buffer_pass->SetMedianBuffer(p_median_pass->GetBuffer());
     p_debug_buffer_pass->SetUpscaledBuffer(p_upscale_pass->GetBuffer());
-    p_debug_buffer_pass->SetRaymaskBuffer(p_raymask_pass->GetBuffer());
-    p_debug_buffer_pass->SetRaycastBGBuffer(p_raycast_pass->GetBGBuffer());
-    p_debug_buffer_pass->SetRaycastFGBuffer(p_raycast_pass->GetFGBuffer());
+    p_debug_buffer_pass->SetRaymaskBuffer(p_dof_pass->GetRaymaskBuffer());
+    p_debug_buffer_pass->SetRaycastBGBuffer(p_median_pass->GetBGBuffer());
+    p_debug_buffer_pass->SetEdgeBuffer(p_raymask_pass->GetBuffer());
 
 
     render_passes.push_back(std::move(p_lighting_pass));
     render_passes.push_back(std::move(p_tile_max_pass));
     render_passes.push_back(std::move(p_neighbour_max_pass));
     render_passes.push_back(std::move(p_pre_dof_pass));
+    render_passes.push_back(std::move(p_raymask_pass));
     render_passes.push_back(std::move(p_dof_pass));
+    render_passes.push_back(std::move(p_raycast_pass));
     render_passes.push_back(std::move(p_median_pass));
     render_passes.push_back(std::move(p_upscale_pass));
     render_passes.push_back(std::move(p_mblur_pass));
-    render_passes.push_back(std::move(p_raymask_pass));
-    render_passes.push_back(std::move(p_raycast_pass));
     render_passes.push_back(std::move(p_debug_buffer_pass));
 
     //Setup all the render passes
@@ -1292,8 +1297,8 @@ void Graphics::CommandCopyImage(const ImageWrap& src, const ImageWrap& dst) cons
     img_copy_region.srcSubresource.layerCount = 1;
     img_copy_region.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
     img_copy_region.dstSubresource.layerCount = 1;
-    img_copy_region.extent.width = window_size.width;
-    img_copy_region.extent.height = window_size.height;
+    img_copy_region.extent.width = src.GetImageSize().width;
+    img_copy_region.extent.height = src.GetImageSize().height;
     img_copy_region.extent.depth = 1;
 
     ImageLayoutBarrier(m_cmd_buffer, src.GetImage(),

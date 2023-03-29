@@ -130,3 +130,7 @@ void Camera::SetSpin(float _spin) {
 void Camera::SetTilt(float _tilt) {
     tilt = _tilt;
 }
+
+bool Camera::WasUpdated() const {
+    return updated;
+}

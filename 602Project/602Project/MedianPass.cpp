@@ -8,6 +8,9 @@
 void MedianPass::SetupBuffer() {
 	m_buffer.CreateTextureSampler();
 	m_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
+
+    m_bg_buffer.CreateTextureSampler();
+    m_bg_buffer.TransitionImageLayout(vk::ImageLayout::eGeneral);
 }
 
 void MedianPass::SetupDescriptor() {
@@ -15,7 +18,12 @@ void MedianPass::SetupDescriptor() {
         {0, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eCompute},
         {1, vk::DescriptorType::eStorageImage, 1,
-         vk::ShaderStageFlagBits::eCompute} });
+         vk::ShaderStageFlagBits::eCompute},
+        {2, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute},
+        {3, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eCompute}
+        });
 }
 
 void MedianPass::SetupPipeline() {
@@ -51,16 +59,26 @@ void MedianPass::SetupPipeline() {
 }
 
 MedianPass::MedianPass(Graphics* _p_gfx, RenderPass* _p_prev_pass) : RenderPass(_p_gfx, _p_prev_pass),
-m_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
-    vk::Format::eR32G32B32A32Sfloat,
-    vk::ImageUsageFlagBits::eTransferDst |
-    vk::ImageUsageFlagBits::eSampled |
-    vk::ImageUsageFlagBits::eStorage |
-    vk::ImageUsageFlagBits::eTransferSrc |
-    vk::ImageUsageFlagBits::eColorAttachment,
-    vk::ImageAspectFlagBits::eColor,
-    vk::MemoryPropertyFlagBits::eDeviceLocal,
-    1, p_gfx) {
+    m_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx),
+    m_bg_buffer(p_gfx->GetWindowSize().x / 2, p_gfx->GetWindowSize().y / 2,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageUsageFlagBits::eTransferDst |
+        vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eTransferSrc |
+        vk::ImageUsageFlagBits::eColorAttachment,
+        vk::ImageAspectFlagBits::eColor,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        1, p_gfx) {
     SetupBuffer();
     SetupDescriptor();
 }
@@ -71,12 +89,15 @@ MedianPass::~MedianPass() {
 
     m_descriptor.destroy(p_gfx->GetDeviceRef());
     m_buffer.destroy(p_gfx->GetDeviceRef());
+    m_bg_buffer.destroy(p_gfx->GetDeviceRef());
 }
 
 void MedianPass::Setup() {
     m_descriptor.write(p_gfx->GetDeviceRef(), 0,
         static_cast<DOFPass*>(p_prev_pass)->GetBuffer().Descriptor());
     m_descriptor.write(p_gfx->GetDeviceRef(), 1, m_buffer.Descriptor());
+    m_descriptor.write(p_gfx->GetDeviceRef(), 2, rt_bg_desc);
+    m_descriptor.write(p_gfx->GetDeviceRef(), 3, m_bg_buffer.Descriptor());
     SetupPipeline();
 }
 
@@ -134,3 +155,12 @@ void MedianPass::DrawGUI()
 const ImageWrap& MedianPass::GetBuffer() const {
     return m_buffer;
 }
+
+const ImageWrap& MedianPass::GetBGBuffer() const {
+    return m_bg_buffer;
+}
+
+void MedianPass::SetRaycastBGDesc(const ImageWrap& _buffer) {
+    rt_bg_desc = _buffer.Descriptor();
+}
+

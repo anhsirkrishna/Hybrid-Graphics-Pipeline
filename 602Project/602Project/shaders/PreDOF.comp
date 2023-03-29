@@ -26,46 +26,6 @@ float g_kernel[3][3] = {
     {0.075, 0.124, 0.075}
 };
 
-//The following function is from Shirley 1997
-vec2 ToUnitDisk(vec2 onSquare) {
-    float phi, r, u, v;
-    float a = 2 * onSquare.x - 1;
-    float b = 2 * onSquare.y - 1;
-
-    if (a > -b) 
-    {
-        if (a > b)
-        {
-            r = a;
-            phi = (PI/4) * (b/a);
-        }
-        else
-        {
-            r = b;
-            phi = (PI/4) * (2 - (a/b));
-        }
-    }
-    else
-    {
-        if (a < b)
-        {
-            r = -a;
-            phi = (PI/4) * (4 + (b/a));
-        }
-        else
-        {
-            r = -b;
-            if (b != 0)
-                phi = (PI/4) * (6 - (a/b));
-            else
-                phi = 0;
-        }
-    }
-    u = r * cos(phi);
-    v = r * sin(phi);
-    return vec2(u,v);
-}
-
 float SoftDepthCompare(float depth1, float depth2) {
     return clamp(1 - (depth1 - depth2) / pc.soft_z_extent, 0, 1);
 }
@@ -91,7 +51,7 @@ void main()
     barrier();
 
     //Next prefilter using 9-tap bilateral filter
-    float coc = CaclulateCoCDiameter(max_depth);
+    float coc = CalculateCoCDiameter(max_depth);
     float coc_radius = coc / 2;
 
     vec2 pixel_size = 1.0f / vec2(imageSize(out_image));

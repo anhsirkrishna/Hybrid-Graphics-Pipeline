@@ -80,6 +80,8 @@ public:
 
 
 protected:
+    BufferWrap scratch_buffer;
+
     std::vector<WrapAccelerationStructure> m_blas;  // Bottom-level acceleration structure
     WrapAccelerationStructure              m_tlas;  // Top-level acceleration structure
 

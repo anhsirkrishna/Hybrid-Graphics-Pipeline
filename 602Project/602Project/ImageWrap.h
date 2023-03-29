@@ -55,5 +55,7 @@ public:
     vk::ImageView GetImageView() const;
 
     const vk::Format& GetFormat() const;
+
+    vk::Extent2D GetImageSize() const;
 };
 

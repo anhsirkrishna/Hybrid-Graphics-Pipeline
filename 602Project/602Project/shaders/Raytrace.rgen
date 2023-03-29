@@ -8,19 +8,19 @@
 
 #include "shared_structs.h"
 
-float pi = 3.14159;
-
 // The ray payload, attached to a ray; used to communicate between shader stages.
 layout(location=0) rayPayloadEXT RayPayload payload;
 
 // Push constant for ray tracing shaders
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
 
 // Ray tracing descriptor set: 0:acceleration structure, and 1: color output image
 layout(set=0, binding=0) uniform accelerationStructureEXT topLevelAS;
 layout(set=0, binding=1, rgba32f) uniform image2D color_buffer_bg;
-layout(set=0, binding=2, rgba32f) uniform image2D color_buffer_fg;
+layout(set=0, binding=2, rgba32f) uniform image2D color_buffer_bg_prev;
 layout(set=0, binding=3, rgba32f) uniform image2D raymask_buffer;
+layout(set=0, binding=4, rgba32f) uniform image2D nd_buffer;
+layout(set=0, binding=5, rgba32f) uniform image2D nd_buffer_prev;
 
 // Object model descriptor set: 0: matrices, 1:object buffer addresses, 2: texture list
 layout(set=1, binding=0) uniform _MatrixUniforms { MatrixUniforms mats; };
@@ -33,6 +33,7 @@ layout(buffer_reference, scalar) buffer Indices {ivec3 i[]; }; // Triangle indic
 layout(buffer_reference, scalar) buffer Materials {Material m[]; }; // Array of all materials
 layout(buffer_reference, scalar) buffer MatIndices {int i[]; }; // Material ID for each triangle
 
+#include "util"
 
 // Generate a random unsigned int from two unsigned int values, using 16 pairs
 // of rounds of the Tiny Encryption Algorithm. See Zafar, Olano, and Curtis,
@@ -69,25 +70,6 @@ float rnd(inout uint prev)
     return (float(lcg(prev)) / float(0x01000000));
 }
 
-// Returns a vector around A, at a "polar" angle cos=cTheta, and an "equatorial" angle Phi
-vec3 SampleLobe(vec3 A, float cTheta, float Phi)
-{
-    float sTheta = sqrt(1- cTheta*cTheta); // Sine of Theta
-    vec3 K = vec3(sTheta*cos(Phi), sTheta*sin(Phi), cTheta); // Vector centered on Z instead of A
-
-
-    // Form coordinate frame around A
-    if (abs(A.z-1.0) < 1e-3) return K;
-    if (abs(A.z+1.0) < 1e-3) return vec3(K[0], -K[1], -K[2]);
-    vec3 B = normalize(vec3(-A[1], A[0], 0.0)); // Z x A
-    vec3 C = cross(A,B);
-    
-    // Rotate Z to A, taking K along with
-    return K[0]*B + K[1]*C + K[2]*A;
-}
-
-// @@ Implement these:
-
 // Returns *almost* the full lighting calculation.
 // Full lighting calculation includes I (N dot L) BRDF(...)
 // This excludes light I;    returns    (N dot L) BRDF(...)
@@ -103,104 +85,239 @@ vec3 EvalBrdf(vec3 N, vec3 L, vec3 V, Material mat) {
     float NH = max(dot(N, H), 0.0);
     float LH = max(dot(L, H), 0.0);
 
-    vec3 brdf;
-    float distribution;
+    float ag = sqrt(2 / (mat.shininess + 2));
+    float a_g2 = ag * ag; //2 / (alpha + 2);
 
-    vec3 fresnel = Ks + ((vec3(1,1,1) - Ks)*pow((1-LH), 5));
-    float visibility = 1/(LH*LH);
+    // Phong
+    float d = (NH * NH) * (a_g2 - 1) + 1;
+    float D = a_g2 / (PI * d * d);
 
-    distribution = ((alpha+2)/(2*pi))*pow(NH, alpha);
-    brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
+    vec3 F = Ks + ((1.0 - Ks) * pow((1.0 - LH), 5));
+    float Vis = 1.0 / (LH * LH);
+        
+    // BRDF w/view term approximation
+    vec3 BRDF = (Kd / PI) + ((F * D * Vis) / 4);
 
-    return NL * brdf;
+    return NL * BRDF;
+}
+
+float SoftDepthCompare(float depth1, float depth2) {
+    return clamp(1 - (depth1 - depth2) / pc.soft_z_extent, 0, 1);
+}
+
+void accumulateSample(vec3 first_norm, float first_depth, ivec2 loc, 
+                      float bilinearWeight, inout vec4 sum_c, inout float sum_w) {
+    vec4 prev_color = imageLoad(color_buffer_bg_prev, loc);
+    vec4 prev_nd = imageLoad(nd_buffer_prev, loc);
+    vec3 nrm = normalize(prev_nd.xyz);
+    float depth = prev_nd.w;
+
+    float nThreshold = 0.95f;
+    float dThreshold = 0.15f;
+
+    float w = bilinearWeight;
+
+    if (dot(first_norm, nrm) < nThreshold) 
+        w = 0;
+    
+    if (abs(first_depth - depth) > dThreshold) 
+        w = 0;
+
+    sum_c += w*prev_color;
+    sum_w += w;
 }
 
 void main() 
 {
-    if (pcRay.alignmentTest != 1234) {
+    if (pc.alignmentTest != 1234) {
         imageStore(color_buffer_bg, ivec2(gl_LaunchIDEXT.xy), vec4(1,0,0,0));
         return;
     }
 
-    // @@ In shaders/shared_structs.h add some random number functionality:
     //  To PushConstantRay add uint frameSeed and initialize to rand() % 32768 in VkApp::raytrace
     //  To RayPayload, add uint seed, and initialize like this:
-    payload.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, pcRay.frameSeed);
+    payload.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, pc.frameSeed);
 
     // This invocation is for a pixel indicated by gl_LaunchIDEXT
     ivec2 gpos = ivec2(gl_LaunchIDEXT.xy);
-    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
-    vec2 pixelNDC = pixelCenter/vec2(gl_LaunchSizeEXT.xy)*2.0 - 1.0;
  
     vec3 eyeW    = (mats.viewInverse * vec4(0, 0, 0, 1)).xyz;
-    vec4 pixelH = mats.viewInverse * mats.projInverse * vec4(pixelNDC.x, pixelNDC.y, 1, 1);
-    vec3 pixelW = pixelH.xyz/pixelH.w;
-    
     vec3 rayO    = eyeW;
-    vec3 rayD = normalize(pixelW - eyeW);
+    
     payload.hit = false;
     payload.hitDist = 0;
 
-    vec3 out_color;
+    vec3 out_color_bg = vec3(0.0);
+    vec3 out_color_fg = vec3(0.0);
 
-    // Fire the ray;  hit or miss shaders will be invoked, passing results back in the payload
-    traceRayEXT(topLevelAS,           // acceleration structure
-                gl_RayFlagsOpaqueEXT, // rayFlags
-                0xFF,                 // cullMask
-                0,                    // sbtRecordOffset
-                0,                    // sbtRecordStride
-                0,                    // missIndex
-                rayO,                 // ray origin
-                0.001,                // ray min range
-                rayD,                 // ray direction
-                10000.0,              // ray max range
-                0                     // payload (location = 0)
-                );
+    float bg_weight = 0.0f;
+    float fg_weight = 0.0f;
 
-    // If nothing was hit, output background color.
-    if (!payload.hit)
-        return;
+    //Get the number of rays to shoot based on the ray mask.
+    vec4 ray_mask = imageLoad(raymask_buffer, gpos);
+    float ray_count = ray_mask.r;
+    int num_rays = int(ray_count * pc.ray_count_factor);
 
-    // Normal light path
-    // If something was hit, find the object data.
-    // Object data (containing 4 device addresses)
-    ObjDesc    objResources = objDesc.i[payload.instanceIndex];
+    float curr_depth = ray_mask.g;
+    float coc_radius = CalculateCoCDiameter(curr_depth) / 2;
+
+    //To store the first hit values in the loop
+    vec3 first_pos, first_norm;
+    float first_depth = 0.0f;
+
+    for (int i = 0 ; i < num_rays; ++i) {
+        vec2 pixel_center = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+        vec2 random_offset = vec2(rnd(payload.seed), rnd(payload.seed));
+        vec2 random_circle_offset = ToUnitDisk(random_offset);
+        //Make the first ray hit the object without any blur radius
+        if (i == 0)
+            random_circle_offset = vec2(0);
+
+        vec2 pixel_random_coc_offset = pixel_center + (coc_radius * random_circle_offset);
+        vec2 pixelNDC = pixel_random_coc_offset/vec2(gl_LaunchSizeEXT.xy)*2.0 - 1.0;
+ 
+        vec4 pixelH = mats.viewInverse * mats.projInverse * vec4(pixelNDC.x, pixelNDC.y, 1, 1);
+        vec3 pixelW = pixelH.xyz/pixelH.w;
+        vec3 rayD = normalize(pixelW - eyeW);
+
+        // Fire the ray;  hit or miss shaders will be invoked, passing results back in the payload
+        traceRayEXT(topLevelAS,           // acceleration structure
+                    gl_RayFlagsOpaqueEXT, // rayFlags
+                    0xFF,                 // cullMask
+                    0,                    // sbtRecordOffset
+                    0,                    // sbtRecordStride
+                    0,                    // missIndex
+                    rayO,                 // ray origin
+                    0.001,                // ray min range
+                    rayD,                 // ray direction
+                    10000.0,              // ray max range
+                    0                     // payload (location = 0)
+                    );
+
+        // If nothing was hit, continue to next ray.
+        if (!payload.hit)
+            continue;
+
+        // Normal light path
+        // If something was hit, find the object data.
+        // Object data (containing 4 device addresses)
+        ObjDesc    objResources = objDesc.i[payload.instanceIndex];
     
-    // Dereference the object's 4 device addresses
-    Vertices   vertices    = Vertices(objResources.vertexAddress);
-    Indices    indices     = Indices(objResources.indexAddress);
-    Materials  materials   = Materials(objResources.materialAddress);
-    MatIndices matIndices  = MatIndices(objResources.materialIndexAddress);
+        // Dereference the object's 4 device addresses
+        Vertices   vertices    = Vertices(objResources.vertexAddress);
+        Indices    indices     = Indices(objResources.indexAddress);
+        Materials  materials   = Materials(objResources.materialAddress);
+        MatIndices matIndices  = MatIndices(objResources.materialIndexAddress);
   
-    // Use gl_PrimitiveID to access the triangle's vertices and material
-    ivec3 ind    = indices.i[payload.primitiveIndex]; // The triangle hit
-    int matIdx   = matIndices.i[payload.primitiveIndex]; // The triangles material index
-    Material mat = materials.m[matIdx]; // The triangles material
+        // Use gl_PrimitiveID to access the triangle's vertices and material
+        ivec3 ind    = indices.i[payload.primitiveIndex]; // The triangle hit
+        int matIdx   = matIndices.i[payload.primitiveIndex]; // The triangles material index
+        Material mat = materials.m[matIdx]; // The triangles material
 
-    // Vertex of the triangle (Vertex has pos, nrm, tex)
-    Vertex v0 = vertices.v[ind.x];
-    Vertex v1 = vertices.v[ind.y];
-    Vertex v2 = vertices.v[ind.z];
+        // Vertex of the triangle (Vertex has pos, nrm, tex)
+        Vertex v0 = vertices.v[ind.x];
+        Vertex v1 = vertices.v[ind.y];
+        Vertex v2 = vertices.v[ind.z];
 
-    // Computing the normal and tex coord at hit position
-    const vec3 bc = payload.bc; // The barycentric coordinates of the hit point
-    const vec3 nrm  = bc.x*v0.nrm      + bc.y*v1.nrm      + bc.z*v2.nrm;
-    const vec2 uv =  bc.x*v0.texCoord + bc.y*v1.texCoord + bc.z*v2.texCoord;
+        // Computing the normal and tex coord at hit position
+        const vec3 bc = payload.bc; // The barycentric coordinates of the hit point
+        const vec3 nrm  = bc.x*v0.nrm      + bc.y*v1.nrm      + bc.z*v2.nrm;
+        const vec2 uv =  bc.x*v0.texCoord + bc.y*v1.texCoord + bc.z*v2.texCoord;
 
-    // If the material has a texture, read diffuse color from it.
-    if (mat.textureId >= 0) {
-        uint txtId = objResources.txtOffset + mat.textureId;
-        mat.diffuse = texture(textureSamplers[(txtId)], uv).xyz; }
+        // If the material has a texture, read diffuse color from it.
+        if (mat.textureId >= 0) {
+            uint txtId = objResources.txtOffset + mat.textureId;
+            mat.diffuse = texture(textureSamplers[(txtId)], uv).xyz; }
         
-    vec3 P = payload.hitPos;  // Current hit point
-    vec3 N = normalize(nrm);  // Its normal
-    vec3 Wo = -rayD;
-    vec3 Wi = normalize(pcRay.lightPosition.xyz - payload.hitPos);
+        vec3 P = payload.hitPos;  // Current hit point
+        vec3 N = normalize(nrm);  // Its normal
+        vec3 Wo = -rayD;
+        vec3 Wi = normalize(pc.lightPosition.xyz - payload.hitPos);
 
-    vec3 brdf = EvalBrdf(N, Wi, Wo, mat);
-    out_color  = (brdf * pcRay.lightIntensity.rgb) + 
-                 (pcRay.ambientIntensity.rgb * mat.diffuse);
+        vec3 brdf = EvalBrdf(N, Wi, Wo, mat);
+        vec3 out_color = (brdf * pc.lightIntensity.rgb) + 
+                         (pc.ambientIntensity.rgb * mat.diffuse);
 
-    imageStore(color_buffer_bg, gpos, vec4(out_color, 1.0f));
-    imageStore(color_buffer_fg, gpos, vec4(1.0f, 0.0f, 1.0f, 1.0f));
+        //Recording first hit values
+        if (i == 0) {
+            first_pos = P;
+            first_norm = N;
+            first_depth = payload.hitDist;   
+        }
+
+        float ray_depth = payload.hitDist;
+        float depth_cmp_bg = SoftDepthCompare(first_depth, ray_depth);
+
+        bg_weight += depth_cmp_bg;
+        //out_color_bg += depth_cmp_bg * out_color;
+
+        out_color_bg += out_color;
+    }
+    vec3 out_color = vec3(0.0f);
+//    if (bg_weight != 0.0f)
+//        out_color = out_color_bg/bg_weight;
+    out_color = out_color_bg / num_rays;
+
+    vec4 screenH = (mats.priorViewProj * vec4(first_pos, 1.0)); //Project to prev buffers
+    vec2 screen = ((screenH.xy/screenH.w) + vec2(1.0)) / 2.0; //H-division and map to [0,1]
+    
+    vec3 old_ave;
+    float old_n;
+    vec4 sum_color;
+    float sum_weight;
+
+    // If first… values were not defined, OR were defined but off-screen in Prev buffers:
+     if (first_depth == 0.0
+        || screen.x < 0 || screen.x > 1 || screen.y < 0 || screen.y > 1) {
+         // Restart pixels accumulation with:
+         old_n = 0;
+         old_ave = vec3(0); 
+     }
+     else {
+        // Retrieve previous accumulation value as a selectively weighted
+         // bilinear interpolation of four neighboring pixels in colPrev buffer
+         vec2 floc = screen * gl_LaunchSizeEXT.xy - vec2(0.5);
+         vec2 off = fract(floc); // offset of current pixel between 4 neighbors.
+         ivec2 iloc = ivec2(floc); // (0,0) corner of the 4 neighbors.
+         // Accumulate 4 numerators(weight*color) and denominators (weights only)
+         sum_color = vec4(0);
+         sum_weight = 0;
+         // Standard notation for the bilinear weights used in 4th parameter below
+         float x0 = 1.0-off.x, x1 = off.x, y0 = 1.0-off.y, y1 = off.y;
+         // Accumualate numerator and denominator across 4 pixels in a 2x2 pattern:
+         // See last page of document for details of accumulateSample.
+         accumulateSample(first_norm, first_depth, iloc+ivec2(0,0), x0*y0, sum_color, sum_weight);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(1,0), x1*y0, sum_color, sum_weight);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(0,1), x0*y1, sum_color, sum_weight);
+         accumulateSample(first_norm, first_depth, iloc+ivec2(1,1), x1*y1, sum_color, sum_weight);
+         // The interpolated history value is sum_color/sum_weight, then split into average and count
+         // @@ Handle the denominator==0 case: Reset history with old_n=0, old_ave=(0,0,0);
+         if (sum_weight == 0) {
+            old_n = 0;
+            old_ave = vec3(0);
+         }
+         else {
+            vec4 history = sum_color/sum_weight;
+            old_n = history.w;
+            old_ave = history.xyz;
+         }
+     }
+
+     if (pc.clear == 1) {
+        old_ave = vec3(0, 0, 0);
+        old_n = 0;
+    }
+
+    float new_n = old_n + 1;
+    vec3 new_ave = old_ave + (out_color - old_ave)/new_n;
+
+    if (any(isnan(new_ave)))
+        new_ave = vec3(0, 0, 0);
+    if (any(isnan(first_norm)))
+        new_ave = vec3(0, 0, 0);
+    if ((isnan(first_depth)))
+        new_ave = vec3(0, 0, 0);
+
+    imageStore(color_buffer_bg, gpos, vec4(new_ave, new_n));
+    imageStore(nd_buffer, gpos, vec4(first_norm, first_depth));
 }
